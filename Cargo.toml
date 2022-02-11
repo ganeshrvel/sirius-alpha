@@ -1,0 +1,31 @@
+[package]
+name = "sirius-alpha-rust"
+version = "0.1.0"
+authors = ["Ganesh Rathinavel <ganeshrvel@outlook.com>"]
+edition = "2018"
+resolver = "2"
+
+[profile.release]
+opt-level = "s"
+
+[profile.dev]
+debug = true # Symbols are nice and they don't increase the size on Flash
+opt-level = "z"
+
+[dependencies]
+anyhow       = "1.0"
+embedded-svc = { version = "0.16", features = ["experimental"] }
+esp-idf-svc  = { version = "0.36", features = ["experimental"] }
+esp-idf-sys  = { version = "0.30", features = ["binstart"] }
+log          = "0.4"
+serde        = { version = "1.0.136", features = ["derive"] }
+strum_macros = "0.23"
+
+
+[build-dependencies]
+embuild = "0.28"
+anyhow = "1"
+
+[features]
+default = ["native"]
+native = ["esp-idf-sys/native"]
