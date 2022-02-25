@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate dotenv_codegen;
+
 use std::{
     sync::{Arc, Mutex},
     thread::sleep,
@@ -31,8 +34,13 @@ mod chip_info;
 
 // WiFI soft AP configuration.
 // To disable authentication use an empty string as the password.
-const WIFI_SSID: &str = "";
-const WIFI_PASS: &str = "";
+
+#[allow(dead_code)]
+const WIFI_SSID: &str = dotenv!("WIFI_SSID");
+
+#[allow(dead_code)]
+const WIFI_PASS: &str = dotenv!("WIFI_PASS");
+
 const WIFI_CHAN: u8 = 6;
 const WIFI_CONN: u8 = 3;
 const DHCP_GTWY: Ipv4Addr = Ipv4Addr::new(10, 0, 0, 1);

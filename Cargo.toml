@@ -20,11 +20,14 @@ esp-idf-sys  = { version = "0.30", features = ["binstart"] }
 log          = "0.4"
 serde        = { version = "1.0.136", features = ["derive"] }
 strum_macros = "0.23"
+dotenv_codegen = "0.15.0"
+
 
 
 [build-dependencies]
 embuild = "0.28"
 anyhow = "1"
+dotenv = "0.15.0"
 
 [features]
 default = ["native"]
