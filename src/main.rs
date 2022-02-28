@@ -1,39 +1,57 @@
+#![deny(clippy::all)]
+#![warn(
+    clippy::all,
+    clippy::restriction,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::cargo,
+    clippy::print_stdout
+)]
+#![allow(
+    clippy::missing_docs_in_private_items,
+    clippy::future_not_send,
+    clippy::implicit_return,
+    clippy::similar_names,
+    clippy::blanket_clippy_restriction_lints,
+    clippy::module_name_repetitions
+)]
+
 #[macro_use]
 extern crate dotenv_codegen;
 
-use std::{
-    sync::{Arc, Mutex},
-    thread::sleep,
-    time::Duration,
-};
+// use std::net::ToSocketAddrs;
+use std::net::{TcpStream, ToSocketAddrs};
+use std::{sync::Arc, thread::sleep, time::Duration};
 
-use anyhow::Result;
-use embedded_svc::{
-    http::{
-        server::{registry::Registry, Body, ResponseData},
-        SendHeaders,
-    },
-    ipv4::{Ipv4Addr, Mask, RouterConfiguration, Subnet},
-    wifi::{AccessPointConfiguration, AuthMethod, Configuration as WifiConfiguration, Wifi},
+use smol::{io, Async, Unblock};
+
+use anyhow::{bail, Result};
+// use embedded_svc::http::client::{Client, Request};
+use embedded_svc::ping::Ping;
+use embedded_svc::wifi::{
+    ClientConfiguration, ClientConnectionStatus, ClientIpStatus, ClientStatus, Configuration,
+    Status,
 };
+use embedded_svc::{ipv4, ipv4::Ipv4Addr, wifi::Wifi};
+// use esp_idf_svc::http::client::EspHttpClient;
+// use embedded_svc::event_bus::EventBus;
+// use embedded_svc::utils::nonblocking::Asyncify;
+// use esp_idf_svc::eventloop::{EspSubscription, System};
 use esp_idf_svc::{
-    http::server::{Configuration as ServerConfiguration, EspHttpRequest, EspHttpServer},
+    // http::server::{EspHttpRequest, EspHttpServer},
     log::EspLogger,
     netif::EspNetifStack,
     nvs::EspDefaultNvs,
+    ping,
     sysloop::EspSysLoopStack,
     wifi::EspWifi,
 };
-use esp_idf_sys::*;
+use esp_idf_sys::link_patches;
+// use esp_idf_sys::*;
 use log::info;
-
-use self::chip_info::ChipInfo;
-
-mod chip_info;
-// mod rgb_led;
-
-// WiFI soft AP configuration.
-// To disable authentication use an empty string as the password.
+use smol::io::AsyncWriteExt;
+// use std::net::TcpStream;
+// use http::Request;
 
 #[allow(dead_code)]
 const WIFI_SSID: &str = dotenv!("WIFI_SSID");
@@ -41,125 +59,147 @@ const WIFI_SSID: &str = dotenv!("WIFI_SSID");
 #[allow(dead_code)]
 const WIFI_PASS: &str = dotenv!("WIFI_PASS");
 
-const WIFI_CHAN: u8 = 6;
-const WIFI_CONN: u8 = 3;
-const DHCP_GTWY: Ipv4Addr = Ipv4Addr::new(10, 0, 0, 1);
+// const WIFI_CHAN: u8 = 6;
+// const WIFI_CONN: u8 = 3;
+// const DHCP_GTWY: Ipv4Addr = Ipv4Addr::new(10, 0, 0, 1);
 
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     link_patches();
     EspLogger::initialize_default();
 
-    // Using the RMT peripheral, set up the RGB LED which is present on the
-    // development board.
-  /*  let mut led = Led::new(rmt_channel_t_RMT_CHANNEL_0, gpio_num_t_GPIO_NUM_8)?;
-    led.set_color(0x00, 0x00, 0x00)?;
+    let netif_stack = Arc::new(EspNetifStack::new()?);
+    let sys_loop_stack = Arc::new(EspSysLoopStack::new()?);
+    let default_nvs = Arc::new(EspDefaultNvs::new()?);
 
-    // Since the LED needs to be shared among handlers, we must first wrap it in a
-    // Mutex to ensure we don't have any races.
-    let led_mutex = Arc::new(Mutex::new(led));
-    let on_mutex = led_mutex.clone();
-    let off_mutex = led_mutex.clone();
-*/
-    // Initialize the Wi-Fi radio and configure it as a soft access point.
-    let _wifi = initialize_soft_ap()?;
-
-    // Start the web server and register all routes/handlers.
-    let mut server = EspHttpServer::new(&ServerConfiguration::default())?;
-    server
-        .at("/")
-        .get(index_html_get_handler)?
-        .at("/api/info")
-        .get(system_info_get_handler)?
-    /* .at("/api/light/on")
-     .get(move |request| led_state_get_handler(request, &on_mutex, [0xFF, 0xFF, 0xFF]))?
-    .at("/api/light/off")
-    .get(move |request| led_state_get_handler(request, &off_mutex, [0x00, 0x00, 0x00]))?*/;
+    let mut _wifi = wifi_f(netif_stack, sys_loop_stack, default_nvs)?;
 
     // Print the startup message, then spin for eternity so that the server does not
     // get dropped!
-    print_startup_message();
-    loop {
-        sleep(Duration::from_secs(1));
-    }
+    //print_startup_message();
+
+    sleep(Duration::from_secs(7));
+
+    smol::block_on(async {
+        println!("==========");
+
+        // Connect to http://example.com
+        // let mut addrs = smol::unblock(move || ("example.com", 80).to_socket_addrs()).await?;
+        // let addr = addrs.next().unwrap();
+        // let mut stream = Async::<TcpStream>::connect(addr).await?;
+        //
+        // // Send an HTTP GET request.
+        // let req = b"GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n";
+        // stream.write_all(req).await?;
+        //
+        // // Read the response and pipe it to the standard output.
+        // let mut stdout = Unblock::new(std::io::stdout());
+        // io::copy(&stream, &mut stdout).await?;
+        Ok(())
+    })
+
+    // loop {
+    //     sleep(Duration::from_secs(2));
+    // }
 }
 
-fn initialize_soft_ap() -> Result<EspWifi> {
-    let mut config = AccessPointConfiguration::default();
+fn wifi_f(
+    netif_stack: Arc<EspNetifStack>,
+    sys_loop_stack: Arc<EspSysLoopStack>,
+    default_nvs: Arc<EspDefaultNvs>,
+) -> Result<Box<EspWifi>> {
+    let mut wifi = Box::new(EspWifi::new(netif_stack, sys_loop_stack, default_nvs)?);
 
-    // Wi-Fi soft AP configuration.
-    config.ssid = WIFI_SSID.to_string();
-    config.channel = WIFI_CHAN;
-    config.max_connections = WIFI_CONN as u16;
+    // info!("Wifi created, about to scan");
+    //
+    // let ap_infos = wifi.scan()?;
+    //
+    // let ours = ap_infos.into_iter().find(|a| a.ssid == WIFI_SSID);
+    //
+    // let channel = if let Some(ours) = ours {
+    //     info!(
+    //         "Found configured access point {} on channel {}",
+    //         WIFI_SSID, ours.channel
+    //     );
+    //     Some(ours.channel)
+    // } else {
+    //     info!(
+    //         "Configured access point {} not found during scanning, will go with unknown channel",
+    //         WIFI_SSID
+    //     );
+    //     None
+    // };
 
-    if !WIFI_PASS.is_empty() {
-        config.auth_method = AuthMethod::WPAWPA2Personal;
-        config.password = WIFI_PASS.to_string();
-    }
+    wifi.set_configuration(&Configuration::Client(ClientConfiguration {
+        ssid: WIFI_SSID.into(),
+        password: WIFI_PASS.into(),
+        // channel,
+        channel: None,
+        ..embedded_svc::wifi::ClientConfiguration::default()
+    }))?;
 
-    // DHCP configuration.
-    config.ip_conf = Some(RouterConfiguration {
-        subnet: Subnet {
-            gateway: DHCP_GTWY,
-            mask: Mask(24),
-        },
-        dhcp_enabled: true,
-        dns: None,
-        secondary_dns: None,
-    });
+    info!("Wifi configuration set, about to get status");
 
-    // Initialize the required ESP-IDF services.
-    let default_nvs = Arc::new(EspDefaultNvs::new()?);
-    let netif_stack = Arc::new(EspNetifStack::new()?);
-    let sys_loop_stack = Arc::new(EspSysLoopStack::new()?);
+    // let we = wifi.subscribe(|shared| {
+    //
+    //     // let status = wifi.get_status();
+    //     println!("=====1 {:?}", s);
+    // })?;
 
-    // Initialize the Wi-Fi peripheral using the above configuration.
-    let mut wifi = EspWifi::new(netif_stack, sys_loop_stack, default_nvs)?;
-    wifi.set_configuration(&WifiConfiguration::AccessPoint(config))?;
+    // wifi.wait_status_with_timeout(Duration::from_secs(7), |status| !status.is_transitional())
+    //     .map_err(|e| anyhow::anyhow!("Unexpected Wifi status: {:?}", e))?;
+    //
+    // let status = wifi.get_status();
+
+    // wifi.wait_status(check_status);
+
+    // println!("====={:?}", status.0);
+
+    //  wifi.wait_status_with_timeout(Duration::from_secs(20),)
+
+    // if let Status(
+    //     ClientStatus::Started(ClientConnectionStatus::Connected(ClientIpStatus::Done(ip_settings))),
+    //     ClientStatus::Started(ClientStatus::Done),
+    // ) = status
+    // {
+    //     info!("Wifi connected");
+    //
+    //     ping_f(&ip_settings)?;
+    // } else {
+    //     bail!("Unexpected Wifi status: {:?}", status);
+    // }
 
     Ok(wifi)
 }
 
-fn index_html_get_handler(_request: &mut EspHttpRequest) -> Result<ResponseData> {
-    let response = ResponseData::new(200)
-        .content_encoding("gzip")
-        .content_type("text/html")
-        .body(Body::from("<html></html>"));
-
-    Ok(response)
-}
-
-fn system_info_get_handler(_request: &mut EspHttpRequest) -> Result<ResponseData> {
-    let chip_info = ChipInfo::new();
-    let response = ResponseData::from_json(&chip_info)?;
-
-    Ok(response)
-}
-
-// fn led_state_get_handler(
-//     _request: &mut EspHttpRequest,
-//     mutex: &Arc<Mutex<Led>>,
-//     colors: [u8; 3],
-// ) -> Result<ResponseData> {
-//     if let Ok(mut led) = mutex.lock() {
-//         led.set_color(colors[0], colors[1], colors[2])?;
-//         Ok(ResponseData::new(200))
-//     } else {
-//         Ok(ResponseData::new(500))
-//     }
+// const fn check_status(status: &Status) -> bool {
+//     use ClientConnectionStatus::Connected;
+//     use ClientIpStatus::Done;
+//     use ClientStatus::Started;
+//     matches!(&status.0, Started(Connected(Done(_ip_settings))))
 // }
-
-fn print_startup_message() {
-    info!("");
-    info!("--------------------------------------------------------------");
-    info!(
-        "Wi-Fi soft AP started, up to {} clients can connect using:",
-        WIFI_CONN
-    );
-    info!("");
-    info!("SSID:     {}", WIFI_SSID);
-    info!("PASSWORD: {}", WIFI_PASS);
-    info!("");
-    info!("Web server listening at: http://{}", DHCP_GTWY);
-    info!("--------------------------------------------------------------");
-    info!("");
-}
+//
+// fn ping_f(ip_settings: &ipv4::ClientSettings) -> Result<()> {
+//     info!("About to do some pings for {:?}", ip_settings);
+//
+//     let ping_summary = ping::EspPing::default().ping(
+//         ip_settings.subnet.gateway,
+//         &embedded_svc::ping::Configuration::default(),
+//     )?;
+//     if ping_summary.transmitted != ping_summary.received {
+//         bail!(
+//             "Pinging gateway {} resulted in timeouts",
+//             ip_settings.subnet.gateway
+//         );
+//     }
+//
+//     info!("Pinging done");
+//
+//     Ok(())
+// }
+//
+// fn print_startup_message() {
+//     info!("");
+//     info!("--------------------------------------------------------------");
+//     info!("--------------------------------------------------------------");
+//     info!("");
+// }
