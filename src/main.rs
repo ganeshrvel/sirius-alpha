@@ -33,7 +33,9 @@ use embedded_svc::wifi::{
     Status,
 };
 use embedded_svc::{ipv4, ipv4::Ipv4Addr, wifi::Wifi};
-// use esp_idf_svc::http::client::EspHttpClient;
+use embedded_svc::http::client::{Client, Request};
+use embedded_svc::http::SendHeaders;
+use esp_idf_svc::http::client::{EspHttpClient, EspHttpClientConfiguration, EspHttpRequest};
 // use embedded_svc::event_bus::EventBus;
 // use embedded_svc::utils::nonblocking::Asyncify;
 // use esp_idf_svc::eventloop::{EspSubscription, System};
@@ -67,6 +69,13 @@ fn main() -> anyhow::Result<()> {
     link_patches();
     EspLogger::initialize_default();
 
+    esp_idf_sys::esp!(unsafe {
+        esp_idf_sys::esp_vfs_eventfd_register(&esp_idf_sys::esp_vfs_eventfd_config_t {
+            max_fds: 5,
+            ..Default::default()
+        })
+    })?;
+
     let netif_stack = Arc::new(EspNetifStack::new()?);
     let sys_loop_stack = Arc::new(EspSysLoopStack::new()?);
     let default_nvs = Arc::new(EspDefaultNvs::new()?);
@@ -78,6 +87,19 @@ fn main() -> anyhow::Result<()> {
     //print_startup_message();
 
     sleep(Duration::from_secs(7));
+
+   //  let espClientConfig = EspHttpClientConfiguration::default();
+   //  let mut espClient = EspHttpClient::new_default()?;
+   //
+   // let mut espPut =  espClient.put(String::from("https://www.google.com"))?;
+   //
+   //  espPut.set_header();
+   //  let espReq  = espPut.send_json()?;
+
+
+
+    // espClient.request()
+    // espClient.post()
 
     smol::block_on(async {
         println!("==========");
