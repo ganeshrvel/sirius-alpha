@@ -14,33 +14,31 @@ debug = true # Symbols are nice and they don't increase the size on Flash
 opt-level = "z"
 
 [dependencies]
-anyhow = "1.0"
-embedded-svc = { version = "0.17.3", features = ["experimental"] }
-esp-idf-svc = { version = "0.37.2", features = ["experimental"] }
-esp-idf-sys = { version = "0.30.6", features = ["binstart"] }
-esp-idf-hal = "0.33.1"
+anyhow = "1.0.55"
+#embedded-svc = { version = "0.17.3", features = ["experimental"] }
+#esp-idf-svc = { version = "0.37.2", features = ["experimental"] }
+esp-idf-svc = "0.36.6"
+esp-idf-hal = "0.32.4"
+embedded-svc = "0.16"
+esp-idf-sys = { version = "0.30.3", features = ["binstart"] }
+#esp-idf-sys = { version = "0.30.6", features = ["binstart"] }
+#esp-idf-hal = "0.33.1"
 log = "0.4.14"
-serde = { version = "1.0.136", features = ["derive"] }
 strum_macros = "0.24.0"
 dotenv_codegen = "0.15.0"
-url = "2"
+url = "2.2.2"
+serde = { version = "1.0.130", features = ["derive"] }
+serde_json = "1.0.72"
+serde-value = "0.7.0"
 
-smol = "1.2.5"
-socket2="0.4.4"
-polling="2.2.0"
-#getrandom="0.2.3"
-#parking_lot="0.12.0"
-#critical-section="0.2.5"
-#atomic-polyfill="0.1.5"
+attohttpc = { git = "https://github.com/killyourphone/attohttpc", branch = "esp32", default-features = false }
+#ring = { git = "https://github.com/killyourphone/ring", branch = "esp32", features = ["size_optimized"] }
+#rustls = { version = "0.20.2", features = ["dangerous_configuration"] }
 
 [patch.crates-io]
-smol = { git = 'https://github.com/esp-rs-compat/smol' }
-socket2 = { git = 'https://github.com/esp-rs-compat/socket2' }
-polling = { git = 'https://github.com/esp-rs-compat/polling' }
-#getrandom = { git = 'https://github.com/esp-rs-compat/getrandom' }
-#parking_lot = { git = 'https://github.com/esp-rs-compat/parking_lot' }
-#critical-section = { git = 'https://github.com/esp-rs-compat/critical-section' }
-#atomic-polyfill = { git = 'https://github.com/esp-rs-compat/atomic-polyfill' }
+#cc = { git = "https://github.com/killyourphone/cc-rs", branch = "esp32" }
+# Overriding ureq is necessary for some reason (it's a build-time dep of embuild)
+#ureq = { git = "https://github.com/killyourphone/ureq", branch = "esp32" }
 
 
 #esp-idf-sys = { version = "0.30.6", features = ["binstart"] }

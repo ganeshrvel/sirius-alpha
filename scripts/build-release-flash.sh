@@ -1,6 +1,8 @@
 #!/bin/zsh
 set -e
 
+source ./scripts/setup_envs.sh
+
 echo "building the release build.."
 
 cargo build --release

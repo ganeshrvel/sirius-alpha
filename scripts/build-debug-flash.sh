@@ -1,6 +1,8 @@
 #!/bin/zsh
 set -e
 
+source ./scripts/setup_envs.sh
+
 echo "building the debug build.."
 
 cargo build
