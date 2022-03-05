@@ -17,10 +17,10 @@ opt-level = "z"
 anyhow = "1.0.55"
 #embedded-svc = { version = "0.17.3", features = ["experimental"] }
 #esp-idf-svc = { version = "0.37.2", features = ["experimental"] }
-esp-idf-svc = "0.36.6"
-esp-idf-hal = "0.32.4"
-embedded-svc = "0.16"
-esp-idf-sys = { version = "0.30.3", features = ["binstart"] }
+esp-idf-svc = "0.37.2"
+esp-idf-hal = { version = "0.33.1" }
+embedded-svc = "0.17.3"
+esp-idf-sys = { version = "0.30.6", features = ["binstart"] }
 #esp-idf-sys = { version = "0.30.6", features = ["binstart"] }
 #esp-idf-hal = "0.33.1"
 log = "0.4.14"
@@ -30,6 +30,10 @@ url = "2.2.2"
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.72"
 serde-value = "0.7.0"
+embedded-hal = "0.2.7"
+#tm1637-gpio-driver = "2.0.5"
+#tm1637-gpio-driver = { version = "2.0.5", default-features = false, features = ["gpio-api-wiringpi"] }
+#tm1637 = "0.1.0"
 
 attohttpc = { git = "https://github.com/killyourphone/attohttpc", branch = "esp32", default-features = false }
 #ring = { git = "https://github.com/killyourphone/ring", branch = "esp32", features = ["size_optimized"] }
