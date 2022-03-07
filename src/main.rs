@@ -16,6 +16,8 @@
     clippy::module_name_repetitions
 )]
 
+// mod tm1637;
+// mod tmdd;
 mod tm1637;
 
 #[macro_use]
@@ -103,10 +105,9 @@ use esp_idf_svc::{
 use esp_idf_sys::c_types::c_uint;
 use esp_idf_sys::link_patches;
 // use esp_idf_sys::*;
-use crate::tm1637::TM1637;
+use crate::tm1637::{SEG_8, TM1637};
 use log::info;
 use serde::{Deserialize, Serialize};
-// use tm1637::TM1637;
 
 // use std::net::TcpStream;
 // use http::Request;
@@ -292,8 +293,8 @@ fn wifi_f(
             let mut led_g26 = pins.gpio26.into_output().unwrap();
             //let mut led_g12 = pins.gpio12.into_output().unwrap();
             // let mut buzzer_g25 = pins.gpio25.into_output().unwrap();
-            let mut led_g27 = pins.gpio27.into_output().unwrap();
-            let mut led_g13 = pins.gpio13.into_input_output().unwrap();
+            let mut clk_g27 = pins.gpio27.into_input_output().unwrap();
+            let mut dio_g13 = pins.gpio13.into_input_output().unwrap();
 
 
             // pins.gpio0.split(&mut rcc.apb2);
@@ -318,28 +319,90 @@ fn wifi_f(
 
             // FreeRtos::from(Ets::);
 
-            let mut tm = TM1637::new(&mut led_g27,&mut led_g13);
+            let mut tm = TM1637::new(&mut clk_g27,&mut dio_g13);
 
             tm.init().unwrap(); // append `.unwrap()` to catch and handle exceptions in cost of extra ROM size
             tm.clear().unwrap();
+            // tm.set_colon(4).unwrap();
+            // tm.set_colon(5).unwrap();
+            // tm.set_colon(6).unwrap();
+            // tm.set_colon(7).unwrap();
+            // tm.set_colon(8).unwrap();
+            // tm.set_colon(10).unwrap();
+            // tm.set_colon(11).unwrap();
+            //tm.set_colon().unwrap();
+
+            // tm.print_raw_iter(0,
+            //                   [14].iter().map(|b| *b)
+            //                 //  digits.iter().map(|digit| DIGITS[(digit & 0xf) as usize]),
+            //
+            //                   ).unwrap();
 
 
            // tm.print_hex(3, &[0]);
 
-           //tm.print_raw(3, &[11]);
+           //tm.print_raw(0x80, &[64]).unwrap();
 
 
             let mut counter = 0;
+
+           //  tm.print_char(0, &[0]).unwrap();
+           // // tm.print_char(1, &[0]).unwrap();
+           //  tm.print_char(2, &[0]).unwrap();
+           //  tm.print_char(3, &[0]).unwrap();
+             tm.set_brightness(7);
+
+            // tm.set_colon(1).unwrap();
+
+
+
+
+            /////////////
+            /////////////
+            /////////////
+            /////////////
+
+
+           /* let clk_pin = PinKind::new_out(clk_pin);
+            let clk_pin  = Rc::from(RefCell::from(Option::from(clk_pin)));
+
+            let dio_pin_num = dio_pin;
+            let dio_pin = PinKind::new_out(dio_pin);
+            let dio_pin = Rc::from(RefCell::from(Option::from(dio_pin)));
+
+            // set up all the wrapper functions that connects the tm1637-driver with wiringpi
+            let pin_clock_write_fn = pin_write_fn_factory(clk_pin);
+            let pin_dio_write_fn = pin_write_fn_factory(dio_pin.clone());
+            let pin_dio_read_fn: Box<dyn Fn() -> GpioPinValue> = pin_read_fn_factory(dio_pin, dio_pin_num);
+            // set up delay-fn: thread::sleep() is not available in lib because out lib is no-std
+
+            // // pass all wrapper functions to the adapter.
+            // TM1637Adapter::new(
+            //     pin_clock_write_fn,
+            //     pin_dio_write_fn,
+            //     pin_dio_read_fn,
+            //     bit_delay_fn,
+            // )
+
+
+            tmdd::lib::TM1637Adapter::new();*/
+
+
+
 
             loop {
                 println!("counter: {}", counter.to_string());
                 println!("counter >> 5: {}", counter >> 5);
 
-                tm.print_hex(0, &[counter, counter + 1]);
-                tm.print_hex(1, &[counter, counter + 2]);
-                tm.print_hex(2, &[counter, counter + 3]);
-                tm.print_raw(3, &[counter]);
-                tm.set_brightness(counter >> 5);
+
+                tm.print_hex(0, &[counter + 0], false);
+                tm.print_hex(1, &[counter+ 1], true);
+                tm.print_hex(2, &[counter+ 2], false);
+                tm.print_hex(3, &[counter+ 3], false);
+
+
+
+                //   tm.print_raw(3, &[counter]);
 
 
                 counter += 1;
@@ -365,16 +428,16 @@ fn wifi_f(
 
 
                             led_g32.set_high().unwrap();
-                            thread::sleep(Duration::from_secs(2));
+                            thread::sleep(Duration::from_secs(1));
                             led_g32.set_low().unwrap();
 
-                            led_g25.set_high().unwrap();
-                            thread::sleep(Duration::from_secs(2));
-                            led_g25.set_low().unwrap();
-
-                            led_g26.set_high().unwrap();
-                            thread::sleep(Duration::from_secs(2));
-                            led_g26.set_low().unwrap();
+                            // led_g25.set_high().unwrap();
+                            // thread::sleep(Duration::from_secs(1));
+                            // led_g25.set_low().unwrap();
+                            //
+                            // led_g26.set_high().unwrap();
+                            // thread::sleep(Duration::from_secs(1));
+                            // led_g26.set_low().unwrap();
 
 
                             // buzzer_g25.set_high().unwrap();
@@ -400,7 +463,7 @@ fn wifi_f(
                         }
                     }
 
-                    thread::sleep(Duration::from_secs(2));
+                    thread::sleep(Duration::from_secs(1));
                 } else {
                     println!("Unexpected Wifi status: {:?}", status);
 

@@ -57,11 +57,52 @@ where
         self.print_raw_iter(address, bytes.iter().map(|b| *b))
     }
 
-    pub fn print_hex(&mut self, address: u8, digits: &[u8]) -> Res<E> {
+    pub fn print_hex(&mut self, address: u8, digits: &[u8], show_colon: bool) -> Res<E> {
         self.print_raw_iter(
             address,
-            digits.iter().map(|digit| DIGITS[(digit & 0xf) as usize]),
+            digits.iter().map(|digit| {
+                let mut d = DIGITS[(digit & 0xf) as usize];
+
+                if address == 1 && show_colon {
+                    d |= SEG_8 as u8;
+                }
+
+                d
+            }),
         )
+    }
+
+    pub fn print_char(&mut self, address: u8, digits: &[u8]) -> Res<E> {
+        self.print_raw_iter(
+            address,
+            digits
+                .iter()
+                .map(|digit| CHAR_y /*DIGITS[(digit & 0xf) as usize]*/),
+        )
+    }
+
+    pub fn set_colon(&mut self, address: u8) -> Res<E> {
+        let d = vec![SEG_8];
+
+        // self.print_raw_iter(
+        //     address,
+        //     [SEG_8]
+        //         .iter()
+        //         .map(|digit| SEG_8 /*DIGITS[(digit & 0xf) as usize]*/),
+        //    // d.into_iter()
+        // )
+
+        let bytes = [SEG_8].iter().map(|digit| SEG_8);
+
+        self.start()?;
+        self.send(ADDRESS_COMMAND_BITS | (address & ADDRESS_COMMAND_MASK))?;
+
+        for byte in bytes {
+            self.send(byte)?;
+        }
+
+        self.stop()?;
+        Ok(())
     }
 
     pub fn print_raw_iter<Iter: Iterator<Item = u8>>(
@@ -152,9 +193,114 @@ const ADDRESS_COMMAND_MASK: u8 = 0x0f;
 const DISPLAY_CONTROL_BRIGHTNESS_BITS: u8 = 0x88;
 const DISPLAY_CONTROL_BRIGHTNESS_MASK: u8 = 0x07;
 
-const DIGITS: [u8; 16] = [
-    0x3f, 0x06, 0x5b, 0x4f, //
-    0x66, 0x6d, 0x7d, 0x07, //
-    0x7f, 0x6f, 0x77, 0x7c, //
-    0x39, 0x5e, 0x79, 0x71, //
+// const DIGITS: [u8; 16] = [
+//     0x3f, 0x06, 0x5b, 0x4f, //
+//     0x66, 0x6d, 0x7d, 0x07, //
+//     0x7f, 0x6f, 0x77, 0x7c, //
+//     0x39, 0x5e, 0x79, 0x71, //
+// ];
+
+/////
+
+/// Data control instruction set
+pub const COM_DATA: u8 = 0b01000000;
+
+/// Display control instruction set
+pub const COM_DISPLAY: u8 = 0b10000000;
+
+/// Address instruction set
+pub const COM_ADDRESS: u8 = 0b11000000;
+
+/// Address adding mode (write to display)
+pub const COM_DATA_ADDRESS_ADD: u8 = COM_DATA | 0b000000;
+/// Data fix address mode (write to display)
+pub const COM_DATA_ADDRESS_FIXED: u8 = COM_DATA | 0b000100;
+/// Read key scan data
+pub const COM_DATA_READ: u8 = COM_DATA | 0b000010;
+
+/// Display ON max brightness.
+/// Can be combined with masked bytes to adjust brightness level
+pub const COM_DISPLAY_ON: u8 = 0b10001000;
+/// Display brightness mask
+pub const DISPLAY_BRIGHTNESS_MASK: u8 = 0b00000111;
+// Display OFF
+pub const COM_DISPLAY_OFF: u8 = 0b10000000;
+
+/// Segment A - top
+pub const SEG_1: u8 = 0b1;
+/// Segment B - top right
+pub const SEG_2: u8 = 0b10;
+/// Segment C - bottom right
+pub const SEG_3: u8 = 0b100;
+/// Segment D - bottom
+pub const SEG_4: u8 = 0b1000;
+/// Segment E - bottom left
+pub const SEG_5: u8 = 0b10000;
+/// Segment F - top left
+pub const SEG_6: u8 = 0b100000;
+/// Segment G - middle
+pub const SEG_7: u8 = 0b1000000;
+/// Segment DP (eight) - dot or colon
+pub const SEG_8: u8 = 0b10000000;
+
+/// Used with 3 wire interface for second byte
+pub const SEG_9: u8 = SEG_1;
+/// Used with 3 wire interface for second byte
+pub const SEG_10: u8 = SEG_2;
+/// Used with 3 wire interface for second byte
+pub const SEG_11: u8 = SEG_3;
+/// Used with 3 wire interface for second byte
+pub const SEG_12: u8 = SEG_4;
+
+pub const CHAR_0: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_1: u8 = SEG_2 | SEG_3;
+pub const CHAR_2: u8 = SEG_1 | SEG_2 | SEG_4 | SEG_5 | SEG_7;
+pub const CHAR_3: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_7;
+pub const CHAR_4: u8 = SEG_2 | SEG_3 | SEG_6 | SEG_7;
+pub const CHAR_5: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
+pub const CHAR_6: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_7: u8 = SEG_1 | SEG_2 | SEG_3;
+pub const CHAR_8: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_9: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
+pub const CHAR_A: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_a: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_7;
+pub const CHAR_b: u8 = SEG_3 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_C: u8 = SEG_1 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_c: u8 = SEG_4 | SEG_5 | SEG_7;
+pub const CHAR_d: u8 = SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_7;
+pub const CHAR_E: u8 = SEG_1 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_e: u8 = SEG_1 | SEG_2 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_F: u8 = SEG_1 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_G: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_H: u8 = SEG_2 | SEG_3 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_h: u8 = SEG_3 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_I: u8 = SEG_2 | SEG_3;
+pub const CHAR_i: u8 = SEG_3;
+pub const CHAR_J: u8 = SEG_2 | SEG_3 | SEG_4 | SEG_5;
+pub const CHAR_L: u8 = SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_l: u8 = SEG_4 | SEG_5;
+pub const CHAR_N: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_5 | SEG_6;
+pub const CHAR_n: u8 = SEG_3 | SEG_5 | SEG_7;
+pub const CHAR_O: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_o: u8 = SEG_3 | SEG_4 | SEG_5 | SEG_7;
+pub const CHAR_P: u8 = SEG_1 | SEG_2 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_q: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_6 | SEG_7;
+pub const CHAR_R: u8 = SEG_1 | SEG_5 | SEG_6;
+pub const CHAR_r: u8 = SEG_5 | SEG_7;
+pub const CHAR_S: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
+pub const CHAR_t: u8 = SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_U: u8 = SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_u: u8 = SEG_3 | SEG_4 | SEG_5;
+pub const CHAR_y: u8 = SEG_2 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
+pub const CHAR_CYR_E: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_7;
+pub const CHAR_CYR_B: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_DEGREE: u8 = SEG_1 | SEG_2 | SEG_6 | SEG_7;
+pub const CHAR_MINUS: u8 = SEG_7;
+pub const CHAR_UNDERSCORE: u8 = SEG_4;
+pub const CHAR_BRACKET_LEFT: u8 = SEG_1 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_BRACKET_RIGHT: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4;
+
+/// List of digit characters where values correlates with array index 0-9.
+pub const DIGITS: [u8; 10] = [
+    CHAR_0, CHAR_1, CHAR_2, CHAR_3, CHAR_4, CHAR_5, CHAR_6, CHAR_7, CHAR_8, CHAR_9,
 ];
