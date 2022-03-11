@@ -28,6 +28,7 @@ use std::fmt::format;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::ptr::null_mut;
 use std::sync::Mutex;
+use std::time::Instant;
 use std::{sync::Arc, thread, thread::sleep, time::Duration};
 
 use anyhow::{bail, Result};
@@ -66,6 +67,7 @@ use esp_idf_hal::{delay, gpio};
 use embedded_hal::digital::v2::OutputPin;
 
 use embedded_hal::blocking::delay::DelayUs;
+use embedded_svc::sys_time::SystemTime;
 //
 // use esp_idf_hal::delay::{Ets, FreeRtos};
 //
@@ -94,6 +96,7 @@ use embedded_hal::blocking::delay::DelayUs;
 // use embedded_svc::event_bus::EventBus;
 // use embedded_svc::utils::nonblocking::Asyncify;
 // use esp_idf_svc::eventloop::{EspSubscription, System};
+use esp_idf_svc::systime::EspSystemTime;
 use esp_idf_svc::{
     // http::server::{EspHttpRequest, EspHttpServer},
     log::EspLogger,
@@ -263,6 +266,83 @@ fn wifi_f(
 
     println!("Wifi configuration set, about to get status");
 
+    let peripherals = Peripherals::take().unwrap();
+    let pins: gpio::Pins = peripherals.pins;
+    // let pins_arc = Arc::new(Mutex::new(pins));
+    //
+    // let pins_arc = pins_arc.lock().unwrap();
+    let mut clk_g27 = pins.gpio27.into_input_output().unwrap();
+    let mut dio_g13 = pins.gpio13.into_input_output().unwrap();
+
+    let mut led_g32 = pins.gpio32.into_output().unwrap();
+    let mut led_g25 = pins.gpio25.into_output().unwrap();
+    let mut led_g26 = pins.gpio26.into_output().unwrap();
+
+    // let now = Instant::now();
+    // if now - t > Duration::from_millis(1000) {
+    //     t = now;
+    //     println!("{:?} thread 0", t);
+    //     //println!("thread 0");
+    // }
+
+    let time_now = esp_idf_svc::systime::EspSystemTime {};
+
+    thread::Builder::new() /*.stack_size(32768)*/
+        .spawn(move || {
+            let mut tm = TM1637::new(&mut clk_g27, &mut dio_g13);
+
+            tm.init().unwrap(); // append `.unwrap()` to catch and handle exceptions in cost of extra ROM size
+            tm.clear().unwrap();
+
+            tm.set_brightness(7).unwrap();
+
+            loop {
+                let mut counter = 0;
+
+                let t = time_now.now();
+                println!("--- time_now {:?}", t);
+
+                let seconds = t.as_secs() % 60;
+                let minutes = (t.as_secs() / 60) % 60;
+                let hours = (t.as_secs() / 60) / 60;
+                println!("--- duration {:02}:{:02}", minutes, seconds);
+
+                let min_sec_t = format!("{:02}{:02}", minutes, seconds);
+
+                let char_vec: Vec<u8> = min_sec_t.chars().map(|a| a as u8).collect();
+                for c in char_vec {
+                    // tm.print_hex(2, &[c_1_int], false);
+
+                    tm.print_hex(counter, &[c], counter == 1);
+
+                    counter += 1;
+                }
+
+                /*let char_vec: Vec<u8> = seconds_t.chars().map(|a| a as u8).collect();
+                for c in char_vec {
+                    // tm.print_hex(2, &[c_1_int], false);
+                    tm.print_hex(counter, &[c], false);
+
+                    counter += 1;
+                }*/
+
+                println!("counter: {}", counter.to_string());
+                println!("counter >> 5: {}", counter >> 5);
+
+                // tm.print_hex(0, &[counter + 0], false);
+                // tm.print_hex(1, &[counter + 1], true);
+                // tm.print_hex(2, &[counter + 2], false);
+                // tm.print_hex(3, &[counter + 3], false);
+
+                // tm.print_hex(0, &[0], false);
+                // tm.print_hex(1, &[0], true);
+                // tm.print_hex(2, &[2], false);
+                // tm.print_hex(3, &[3], false);
+
+                thread::sleep(Duration::from_millis(1000))
+            }
+        });
+
     thread::Builder::new()
         .stack_size(32768)
         .spawn(move || {
@@ -270,8 +350,7 @@ fn wifi_f(
                 esp_idf_sys::vTaskPrioritySet(null_mut(), 1_u32 as c_uint);
             }
 
-            let peripherals = Peripherals::take().unwrap();
-            let pins: gpio::Pins = peripherals.pins;
+
 
             // let (clk_pin, dio_pin) = (27, 23);
             //
@@ -288,71 +367,21 @@ fn wifi_f(
             // tm1637display.write_segments_raw(&data, 0);
 
 
-            let mut led_g32 = pins.gpio32.into_output().unwrap();
-            let mut led_g25 = pins.gpio25.into_output().unwrap();
-            let mut led_g26 = pins.gpio26.into_output().unwrap();
-            //let mut led_g12 = pins.gpio12.into_output().unwrap();
+              //let mut led_g12 = pins.gpio12.into_output().unwrap();
             // let mut buzzer_g25 = pins.gpio25.into_output().unwrap();
-            let mut clk_g27 = pins.gpio27.into_input_output().unwrap();
-            let mut dio_g13 = pins.gpio13.into_input_output().unwrap();
 
 
-            // pins.gpio0.split(&mut rcc.apb2);
+           /* let mut clk_g27 = pins.gpio27.into_input_output().unwrap();
+            let mut dio_g13 = pins.gpio13.into_input_output().unwrap();*/
 
-           // let dd = embedded_hal::blocking::delay::DelayUs::delay_us();
-// Ets
-      //      Ets
-           // let dd =   Ets::delay_us(1000);
-
-            //let mut delay = Delay::new(cp.SYST, clocks);
-            // let mut t = NoDelay{};
-            // let d = t.delay_us(1000);
-
-          //  let mut  d =  FreeRtos.delay_us(1000 as u8);//
-            //embedded_hal::blocking::delay::DelayUs{}
-
-            //let mut d = delay::ets_delay_us()//Ets{}.delay_us(1000_u8); //::new(cp.SYST, clocks);
-
-            //TM1637
-
-            // let mut t = TickType::from(Duration::from_micros(1000));
-
-            // FreeRtos::from(Ets::);
-
-            let mut tm = TM1637::new(&mut clk_g27,&mut dio_g13);
+            /*let mut tm = TM1637::new(&mut clk_g27,&mut dio_g13);
 
             tm.init().unwrap(); // append `.unwrap()` to catch and handle exceptions in cost of extra ROM size
-            tm.clear().unwrap();
-            // tm.set_colon(4).unwrap();
-            // tm.set_colon(5).unwrap();
-            // tm.set_colon(6).unwrap();
-            // tm.set_colon(7).unwrap();
-            // tm.set_colon(8).unwrap();
-            // tm.set_colon(10).unwrap();
-            // tm.set_colon(11).unwrap();
-            //tm.set_colon().unwrap();
-
-            // tm.print_raw_iter(0,
-            //                   [14].iter().map(|b| *b)
-            //                 //  digits.iter().map(|digit| DIGITS[(digit & 0xf) as usize]),
-            //
-            //                   ).unwrap();
-
-
-           // tm.print_hex(3, &[0]);
-
-           //tm.print_raw(0x80, &[64]).unwrap();
-
+            tm.clear().unwrap();*/
 
             let mut counter = 0;
 
-           //  tm.print_char(0, &[0]).unwrap();
-           // // tm.print_char(1, &[0]).unwrap();
-           //  tm.print_char(2, &[0]).unwrap();
-           //  tm.print_char(3, &[0]).unwrap();
-             tm.set_brightness(7);
-
-            // tm.set_colon(1).unwrap();
+            /* tm.set_brightness(7);*/
 
 
 
@@ -361,51 +390,18 @@ fn wifi_f(
             /////////////
             /////////////
             /////////////
-
-
-           /* let clk_pin = PinKind::new_out(clk_pin);
-            let clk_pin  = Rc::from(RefCell::from(Option::from(clk_pin)));
-
-            let dio_pin_num = dio_pin;
-            let dio_pin = PinKind::new_out(dio_pin);
-            let dio_pin = Rc::from(RefCell::from(Option::from(dio_pin)));
-
-            // set up all the wrapper functions that connects the tm1637-driver with wiringpi
-            let pin_clock_write_fn = pin_write_fn_factory(clk_pin);
-            let pin_dio_write_fn = pin_write_fn_factory(dio_pin.clone());
-            let pin_dio_read_fn: Box<dyn Fn() -> GpioPinValue> = pin_read_fn_factory(dio_pin, dio_pin_num);
-            // set up delay-fn: thread::sleep() is not available in lib because out lib is no-std
-
-            // // pass all wrapper functions to the adapter.
-            // TM1637Adapter::new(
-            //     pin_clock_write_fn,
-            //     pin_dio_write_fn,
-            //     pin_dio_read_fn,
-            //     bit_delay_fn,
-            // )
-
-
-            tmdd::lib::TM1637Adapter::new();*/
-
-
-
 
             loop {
-                println!("counter: {}", counter.to_string());
-                println!("counter >> 5: {}", counter >> 5);
+                // println!("counter: {}", counter.to_string());
+                // println!("counter >> 5: {}", counter >> 5);
 
 
-                tm.print_hex(0, &[counter + 0], false);
+              /*  tm.print_hex(0, &[counter + 0], false);
                 tm.print_hex(1, &[counter+ 1], true);
                 tm.print_hex(2, &[counter+ 2], false);
-                tm.print_hex(3, &[counter+ 3], false);
+                tm.print_hex(3, &[counter+ 3], false);*/
 
-
-
-                //   tm.print_raw(3, &[counter]);
-
-
-                counter += 1;
+            //    counter += 1;
 
                 let status = wifi_arc_clone.clone().lock().unwrap().get_status();
 
@@ -431,13 +427,13 @@ fn wifi_f(
                             thread::sleep(Duration::from_secs(1));
                             led_g32.set_low().unwrap();
 
-                            // led_g25.set_high().unwrap();
-                            // thread::sleep(Duration::from_secs(1));
-                            // led_g25.set_low().unwrap();
-                            //
-                            // led_g26.set_high().unwrap();
-                            // thread::sleep(Duration::from_secs(1));
-                            // led_g26.set_low().unwrap();
+                            led_g25.set_high().unwrap();
+                            thread::sleep(Duration::from_secs(1));
+                            led_g25.set_low().unwrap();
+
+                            led_g26.set_high().unwrap();
+                            thread::sleep(Duration::from_secs(1));
+                            led_g26.set_low().unwrap();
 
 
                             // buzzer_g25.set_high().unwrap();
@@ -446,7 +442,7 @@ fn wifi_f(
 
                         }
                         Err(err) => {
-                            println!("--- Couldn't fetch page, will sleep: {}", err.to_string());
+                            println!("--- Couldn't fetch page, will sleep: {} {}", err.to_string(), API_BASE_URL);
                             println!("Maybe check your system time if you have certificate validation issues?");
                             // unsafe {
                             //     esp_idf_sys::settimeofday(
