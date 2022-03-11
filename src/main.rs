@@ -108,7 +108,7 @@ use esp_idf_svc::{
 use esp_idf_sys::c_types::c_uint;
 use esp_idf_sys::link_patches;
 // use esp_idf_sys::*;
-use crate::tm1637::{SEG_8, TM1637};
+use crate::tm1637::{CHAR_H, SEG_8, TM1637};
 use log::info;
 use serde::{Deserialize, Serialize};
 
@@ -297,25 +297,46 @@ fn wifi_f(
             tm.set_brightness(7).unwrap();
 
             loop {
-                let mut counter = 0;
+                let mut pin_number = 0;
 
                 let t = time_now.now();
                 println!("--- time_now {:?}", t);
+
+                //todo remove this test block
+                let t = t + Duration::from_secs(3540);
+                println!("--- new_time_now {:?}", t);
+
+                //todo remove this test block
 
                 let seconds = t.as_secs() % 60;
                 let minutes = (t.as_secs() / 60) % 60;
                 let hours = (t.as_secs() / 60) / 60;
                 println!("--- duration {:02}:{:02}", minutes, seconds);
 
-                let min_sec_t = format!("{:02}{:02}", minutes, seconds);
+                if hours < 1 {
+                    let min_sec_t = format!("{:02}{:02}", minutes, seconds);
 
-                let char_vec: Vec<u8> = min_sec_t.chars().map(|a| a as u8).collect();
-                for c in char_vec {
-                    // tm.print_hex(2, &[c_1_int], false);
+                    let char_vec: Vec<u8> = min_sec_t.chars().map(|a| a as u8).collect();
+                    for c in char_vec {
+                        // tm.print_hex(2, &[c_1_int], false);
 
-                    tm.print_digit(counter, &[c], counter == 1);
+                        tm.print_digit(pin_number, &[c], pin_number == 1);
 
-                    counter += 1;
+                        pin_number += 1;
+                    }
+                } else {
+                    let hour_sec_t = format!("{}{}{:02}", hours, CHAR_H, minutes);
+
+                    let sec_to_min = seconds / 60;
+
+                    let char_vec: Vec<u8> = hour_sec_t.chars().map(|a| a as u8).collect();
+                    for c in char_vec {
+                        if pin_number < 4 {
+                            tm.print_digit(pin_number, &[c], false);
+
+                            pin_number += 1;
+                        }
+                    }
                 }
 
                 /*let char_vec: Vec<u8> = seconds_t.chars().map(|a| a as u8).collect();
@@ -326,8 +347,8 @@ fn wifi_f(
                     counter += 1;
                 }*/
 
-                println!("counter: {}", counter.to_string());
-                println!("counter >> 5: {}", counter >> 5);
+                println!("counter: {}", pin_number.to_string());
+                println!("counter >> 5: {}", pin_number >> 5);
 
                 // tm.print_hex(0, &[counter + 0], false);
                 // tm.print_hex(1, &[counter + 1], true);
