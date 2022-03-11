@@ -313,7 +313,7 @@ fn wifi_f(
                 for c in char_vec {
                     // tm.print_hex(2, &[c_1_int], false);
 
-                    tm.print_hex(counter, &[c], counter == 1);
+                    tm.print_digit(counter, &[c], counter == 1);
 
                     counter += 1;
                 }

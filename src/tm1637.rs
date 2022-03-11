@@ -54,10 +54,10 @@ where
     }
 
     pub fn print_raw(&mut self, address: u8, bytes: &[u8]) -> Res<E> {
-        self.print_raw_iter(address, bytes.iter().map(|b| *b))
+        self.print_raw_iter(address, bytes.iter().copied())
     }
 
-    pub fn print_hex(&mut self, address: u8, digits: &[u8], show_colon: bool) -> Res<E> {
+    pub fn print_digit(&mut self, address: u8, digits: &[u8], show_colon: bool) -> Res<E> {
         self.print_raw_iter(
             address,
             digits.iter().map(|digit| {
@@ -72,16 +72,11 @@ where
         )
     }
 
-    pub fn print_char(&mut self, address: u8, digits: &[u8]) -> Res<E> {
-        self.print_raw_iter(
-            address,
-            digits
-                .iter()
-                .map(|digit| CHAR_y /*DIGITS[(digit & 0xf) as usize]*/),
-        )
+    pub fn print_char(&mut self, address: u8, chr: u8) -> Res<E> {
+        self.print_raw_iter(address, [chr].iter().copied())
     }
 
-    pub fn set_colon(&mut self, address: u8) -> Res<E> {
+    /*pub fn set_colon(&mut self, address: u8) -> Res<E> {
         let d = vec![SEG_8];
 
         // self.print_raw_iter(
@@ -103,7 +98,7 @@ where
 
         self.stop()?;
         Ok(())
-    }
+    }*/
 
     pub fn print_raw_iter<Iter: Iterator<Item = u8>>(
         &mut self,
