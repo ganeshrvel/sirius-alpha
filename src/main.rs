@@ -108,7 +108,7 @@ use esp_idf_svc::{
 use esp_idf_sys::c_types::c_uint;
 use esp_idf_sys::link_patches;
 // use esp_idf_sys::*;
-use crate::tm1637::{CHAR_H, SEG_8, TM1637};
+use crate::tm1637::{TM1637BannerAutoScrollConfig, TM1637};
 use log::info;
 use serde::{Deserialize, Serialize};
 
@@ -287,84 +287,99 @@ fn wifi_f(
 
     let time_now = esp_idf_svc::systime::EspSystemTime {};
 
-    thread::Builder::new() /*.stack_size(32768)*/
-        .spawn(move || {
-            let mut tm = TM1637::new(&mut clk_g27, &mut dio_g13);
+    thread::Builder::new()/*.stack_size(32768)*/.spawn(move || {
+        let mut tm = TM1637::new(&mut clk_g27, &mut dio_g13);
 
-            tm.init().unwrap(); // append `.unwrap()` to catch and handle exceptions in cost of extra ROM size
-            tm.clear().unwrap();
+        tm.init().unwrap(); // append `.unwrap()` to catch and handle exceptions in cost of extra ROM size
+        tm.clear().unwrap();
 
-            tm.set_brightness(7).unwrap();
+        tm.set_brightness(7).unwrap();
 
-            loop {
-                let mut pin_number = 0;
+        loop {
+            let mut pin_number = 0;
 
-                let t = time_now.now();
-                println!("--- time_now {:?}", t);
+            let t = time_now.now();
+            println!("--- time_now {:?}", t);
 
-                //todo remove this test block
-                let t = t + Duration::from_secs(3540);
-                println!("--- new_time_now {:?}", t);
+            //todo remove this test block
+            let t = t + Duration::from_secs(3590);
+            println!("--- new_time_now {:?}", t);
 
-                //todo remove this test block
+            //todo remove this test block
 
-                let seconds = t.as_secs() % 60;
-                let minutes = (t.as_secs() / 60) % 60;
-                let hours = (t.as_secs() / 60) / 60;
-                println!("--- duration {:02}:{:02}", minutes, seconds);
+            let seconds = t.as_secs() % 60;
+            let minutes = (t.as_secs() / 60) % 60;
+            let hours = (t.as_secs() / 60) / 60;
+            println!("--- duration {:02}:{:02}", minutes, seconds);
 
-                if hours < 1 {
-                    let min_sec_t = format!("{:02}{:02}", minutes, seconds);
+            if hours < 1 {
+                let min_sec_t = format!("{:02}{:02}", minutes, seconds);
 
-                    let char_vec: Vec<u8> = min_sec_t.chars().map(|a| a as u8).collect();
-                    for c in char_vec {
-                        // tm.print_hex(2, &[c_1_int], false);
+                tm.print_string(&min_sec_t, true, None).unwrap();
 
-                        tm.print_digit(pin_number, &[c], pin_number == 1);
-
-                        pin_number += 1;
-                    }
-                } else {
-                    let hour_sec_t = format!("{}{}{:02}", hours, CHAR_H, minutes);
-
-                    let sec_to_min = seconds / 60;
-
-                    let char_vec: Vec<u8> = hour_sec_t.chars().map(|a| a as u8).collect();
-                    for c in char_vec {
-                        if pin_number < 4 {
-                            tm.print_digit(pin_number, &[c], false);
-
-                            pin_number += 1;
-                        }
-                    }
-                }
-
-                /*let char_vec: Vec<u8> = seconds_t.chars().map(|a| a as u8).collect();
+                /*let char_vec: Vec<u8> = min_sec_t.chars().map(|a| a as u8).collect();
                 for c in char_vec {
                     // tm.print_hex(2, &[c_1_int], false);
-                    tm.print_hex(counter, &[c], false);
 
-                    counter += 1;
+                    tm.print_string(pin_number, &[c], pin_number == 1);
+
+                    pin_number += 1;
                 }*/
 
-                println!("counter: {}", pin_number.to_string());
-                println!("counter >> 5: {}", pin_number >> 5);
-
-                // tm.print_hex(0, &[counter + 0], false);
-                // tm.print_hex(1, &[counter + 1], true);
-                // tm.print_hex(2, &[counter + 2], false);
-                // tm.print_hex(3, &[counter + 3], false);
-
-                // tm.print_hex(0, &[0], false);
-                // tm.print_hex(1, &[0], true);
-                // tm.print_hex(2, &[2], false);
-                // tm.print_hex(3, &[3], false);
-
                 thread::sleep(Duration::from_millis(1000))
-            }
-        });
+            } else {
+                let hour_min_sec_t = format!(
+                    "{}{} {:02}{} {:02}{}",
+                    hours, "h", minutes, "n", seconds, "o"
+                );
 
-    thread::Builder::new()
+                let c = TM1637BannerAutoScrollConfig {
+                    scroll_min_char_count: tm.display_size + 1,
+                    delay_ms: 1000,
+                    min_char_count_to_be_displayed: tm.display_size,
+                };
+                tm.print_string(&hour_min_sec_t, false, Some(&c)).unwrap();
+
+                thread::sleep(Duration::from_millis(9000))
+            } /*else {
+                  let hour_sec_t = format!("{}{}{:02}", hours, CHAR_H, minutes);
+
+                  let sec_to_min = seconds / 60;
+
+                  let char_vec: Vec<u8> = hour_sec_t.chars().map(|a| a as u8).collect();
+                  for c in char_vec {
+                      if pin_number < 4 {
+                          tm.print_digit(pin_number, &[c], false);
+
+                          pin_number += 1;
+                      }
+                  }
+              }*/
+
+            /*let char_vec: Vec<u8> = seconds_t.chars().map(|a| a as u8).collect();
+            for c in char_vec {
+                // tm.print_hex(2, &[c_1_int], false);
+                tm.print_hex(counter, &[c], false);
+
+                counter += 1;
+            }*/
+
+            // println!("counter: {}", pin_number.to_string());
+            // println!("counter >> 5: {}", pin_number >> 5);
+
+            // tm.print_hex(0, &[counter + 0], false);
+            // tm.print_hex(1, &[counter + 1], true);
+            // tm.print_hex(2, &[counter + 2], false);
+            // tm.print_hex(3, &[counter + 3], false);
+
+            // tm.print_hex(0, &[0], false);
+            // tm.print_hex(1, &[0], true);
+            // tm.print_hex(2, &[2], false);
+            // tm.print_hex(3, &[3], false);
+        }
+    });
+
+/*    thread::Builder::new()
         .stack_size(32768)
         .spawn(move || {
             unsafe {
@@ -487,7 +502,7 @@ fn wifi_f(
                     thread::sleep(Duration::from_secs(3));
                 }
             }
-        })?;
+        })?;*/
 
     Ok(())
 }
