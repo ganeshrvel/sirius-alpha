@@ -1,3 +1,4 @@
+// ref: https://github.com/phip1611/generic-tm1637-gpio-driver-rust/blob/main/src/lib.rs
 // ref: https://github.com/igelbox/tm1637-rs/blob/master/examples/main.rs
 // ref: https://github.com/rustrum/tmledkey-hal-drv/blob/master/examples/stm32f103/src/main.rs
 // ref: https://github.com/rustrum/tmledkey-hal-drv/blob/b5e0759c41442d4e28c0ae26ad2bc393c43f814c/src/lib.rs
@@ -9,7 +10,6 @@ use embedded_hal::prelude::{
 };
 use esp_idf_hal::delay;
 use hal::digital::v2::{InputPin, OutputPin};
-
 
 #[derive(Debug)]
 pub enum Error<E> {
@@ -37,12 +37,11 @@ pub struct TM1637<'a, CLK, DIO> {
     delay_us: u16,
 }
 
-pub struct TM1637BannerAutoScrollConfig {
+pub struct Tm1637BannerAutoScrollConfig {
     pub(crate) scroll_min_char_count: u8,
     pub(crate) delay_ms: u16,
     pub(crate) min_char_count_to_be_displayed: u8,
 }
-
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum GpioPinValue {
@@ -413,23 +412,20 @@ where
         // Command 1
         // for more information about this flow: see data sheet / specification of TM1637
         // or AZDelivery's 7 segment display
-        self.start();
-        self.write_byte_and_wait_ack(ISA::DataCommandWriteToDisplay as u8);
-        self.stop();
+        self.start()?;
+        self.write_byte_and_wait_ack(ISA::DataCommandWriteToDisplay as u8)?;
+        self.stop()?;
 
         // Write COMM2
-        self.start();
-        self.write_byte_and_wait_ack(ISA::AddressCommandD0 as u8 | pos);
+        self.start()?;
+        self.write_byte_and_wait_ack(ISA::AddressCommandD0 as u8 | pos)?;
 
         // Write the remaining data bytes
         // TM1637 does auto increment internally
-
-        //println!("n={}, pos={}, data={:#?}", n, pos, segments);
-
         for i in 0..n {
-            self.write_byte_and_wait_ack(segments[i as usize]);
+            self.write_byte_and_wait_ack(segments[i as usize])?;
         }
-        self.stop();
+        self.stop()?;
 
         // we do this everytime because it will be a common flow that people write something
         // and expect the display to be on
@@ -455,7 +451,7 @@ where
         let mut data = byte;
 
         // 8 bits
-        for _ in 0..8 {
+        for _ in 0_u8..8_u8 {
             // CLK low
             self.clk.set_low()?;
 
@@ -463,11 +459,8 @@ where
             // LSF (least significant bit) first
             // => target has (probably?) shift register => this way the byte has the
             // correct order on the target
-            // (self.pin_dio_write_fn)(GpioPinValue::from(data & 0x01));
-
             let next_gpio_state = GpioPinValue::from(data & 0x01);
 
-            //todo interchange maybe ?
             if next_gpio_state == GpioPinValue::High {
                 self.dio.set_high()?;
             } else {
@@ -482,7 +475,7 @@ where
             self.set_delay_us();
 
             // shift to next bit
-            data = data >> 1;
+            data >>= 1;
         }
 
         self.recv_ack()

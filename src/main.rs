@@ -96,7 +96,6 @@ use embedded_svc::sys_time::SystemTime;
 // use embedded_svc::event_bus::EventBus;
 // use embedded_svc::utils::nonblocking::Asyncify;
 // use esp_idf_svc::eventloop::{EspSubscription, System};
-use esp_idf_svc::systime::EspSystemTime;
 use esp_idf_svc::{
     // http::server::{EspHttpRequest, EspHttpServer},
     log::EspLogger,
@@ -108,7 +107,7 @@ use esp_idf_svc::{
 use esp_idf_sys::c_types::c_uint;
 use esp_idf_sys::link_patches;
 // use esp_idf_sys::*;
-use crate::tm1637::{Brightness, DisplayState, SegmentBits, TM1637BannerAutoScrollConfig, TM1637};
+use crate::tm1637::{Brightness, DisplayState, SegmentBits, Tm1637BannerAutoScrollConfig, TM1637};
 use log::info;
 use serde::{Deserialize, Serialize};
 
@@ -326,7 +325,7 @@ fn wifi_f(
                         hours, "h", minutes, "n", seconds, "c"
                     );
 
-                    let c = TM1637BannerAutoScrollConfig {
+                    let c = Tm1637BannerAutoScrollConfig {
                         scroll_min_char_count: tm.display_size + 1,
                         delay_ms: 750,
                         min_char_count_to_be_displayed: tm.display_size,
@@ -338,7 +337,7 @@ fn wifi_f(
             }
         });
 
-        thread::Builder::new()
+    thread::Builder::new()
     .stack_size(32768)
     .spawn(move || {
         unsafe {
