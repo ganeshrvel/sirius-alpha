@@ -108,7 +108,7 @@ use esp_idf_svc::{
 use esp_idf_sys::c_types::c_uint;
 use esp_idf_sys::link_patches;
 // use esp_idf_sys::*;
-use crate::tm1637::{TM1637BannerAutoScrollConfig, TM1637};
+use crate::tm1637::{Brightness, DisplayState, SegmentBits, TM1637BannerAutoScrollConfig, TM1637};
 use log::info;
 use serde::{Deserialize, Serialize};
 
@@ -287,222 +287,132 @@ fn wifi_f(
 
     let time_now = esp_idf_svc::systime::EspSystemTime {};
 
-    thread::Builder::new()/*.stack_size(32768)*/.spawn(move || {
-        let mut tm = TM1637::new(&mut clk_g27, &mut dio_g13);
-
-        tm.init().unwrap(); // append `.unwrap()` to catch and handle exceptions in cost of extra ROM size
-        tm.clear().unwrap();
-
-        tm.set_brightness(7).unwrap();
-
-        loop {
-            let mut pin_number = 0;
-
-            let t = time_now.now();
-            println!("--- time_now {:?}", t);
-
-            //todo remove this test block
-            let t = t + Duration::from_secs(3590);
-            println!("--- new_time_now {:?}", t);
-
-            //todo remove this test block
-
-            let seconds = t.as_secs() % 60;
-            let minutes = (t.as_secs() / 60) % 60;
-            let hours = (t.as_secs() / 60) / 60;
-            println!("--- duration {:02}:{:02}", minutes, seconds);
-
-            if hours < 1 {
-                let min_sec_t = format!("{:02}{:02}", minutes, seconds);
-
-                tm.print_string(&min_sec_t, true, None).unwrap();
-
-                /*let char_vec: Vec<u8> = min_sec_t.chars().map(|a| a as u8).collect();
-                for c in char_vec {
-                    // tm.print_hex(2, &[c_1_int], false);
-
-                    tm.print_string(pin_number, &[c], pin_number == 1);
-
-                    pin_number += 1;
-                }*/
-
-                thread::sleep(Duration::from_millis(1000))
-            } else {
-                let hour_min_sec_t = format!(
-                    "{}{} {:02}{} {:02}{}",
-                    hours, "h", minutes, "n", seconds, "o"
-                );
-
-                let c = TM1637BannerAutoScrollConfig {
-                    scroll_min_char_count: tm.display_size + 1,
-                    delay_ms: 1000,
-                    min_char_count_to_be_displayed: tm.display_size,
-                };
-                tm.print_string(&hour_min_sec_t, false, Some(&c)).unwrap();
-
-                thread::sleep(Duration::from_millis(9000))
-            } /*else {
-                  let hour_sec_t = format!("{}{}{:02}", hours, CHAR_H, minutes);
-
-                  let sec_to_min = seconds / 60;
-
-                  let char_vec: Vec<u8> = hour_sec_t.chars().map(|a| a as u8).collect();
-                  for c in char_vec {
-                      if pin_number < 4 {
-                          tm.print_digit(pin_number, &[c], false);
-
-                          pin_number += 1;
-                      }
-                  }
-              }*/
-
-            /*let char_vec: Vec<u8> = seconds_t.chars().map(|a| a as u8).collect();
-            for c in char_vec {
-                // tm.print_hex(2, &[c_1_int], false);
-                tm.print_hex(counter, &[c], false);
-
-                counter += 1;
-            }*/
-
-            // println!("counter: {}", pin_number.to_string());
-            // println!("counter >> 5: {}", pin_number >> 5);
-
-            // tm.print_hex(0, &[counter + 0], false);
-            // tm.print_hex(1, &[counter + 1], true);
-            // tm.print_hex(2, &[counter + 2], false);
-            // tm.print_hex(3, &[counter + 3], false);
-
-            // tm.print_hex(0, &[0], false);
-            // tm.print_hex(1, &[0], true);
-            // tm.print_hex(2, &[2], false);
-            // tm.print_hex(3, &[3], false);
-        }
-    });
-
-/*    thread::Builder::new()
-        .stack_size(32768)
+    thread::Builder::new() /*.stack_size(32768)*/
         .spawn(move || {
-            unsafe {
-                esp_idf_sys::vTaskPrioritySet(null_mut(), 1_u32 as c_uint);
-            }
-
-
-
-            // let (clk_pin, dio_pin) = (27, 23);
-            //
-            // let bit_delay_fn = Box::from(|| sleep(Duration::from_micros(10)));
-            // let tm1637display = setup_gpio(clk_pin, dio_pin, bit_delay_fn);
-            //
-            // // display "1 2 3 4"
-            // let data: [u8; 4] = [
-            //     TM1637Adapter::encode_digit(1),
-            //     TM1637Adapter::encode_digit(2),
-            //     TM1637Adapter::encode_digit(3),
-            //     TM1637Adapter::encode_digit(4),
-            // ];
-            // tm1637display.write_segments_raw(&data, 0);
-
-
-              //let mut led_g12 = pins.gpio12.into_output().unwrap();
-            // let mut buzzer_g25 = pins.gpio25.into_output().unwrap();
-
-
-           /* let mut clk_g27 = pins.gpio27.into_input_output().unwrap();
-            let mut dio_g13 = pins.gpio13.into_input_output().unwrap();*/
-
-            /*let mut tm = TM1637::new(&mut clk_g27,&mut dio_g13);
-
-            tm.init().unwrap(); // append `.unwrap()` to catch and handle exceptions in cost of extra ROM size
-            tm.clear().unwrap();*/
-
-            let mut counter = 0;
-
-            /* tm.set_brightness(7);*/
-
-
-
-
-            /////////////
-            /////////////
-            /////////////
-            /////////////
+            let mut tm = TM1637::new(&mut clk_g27, &mut dio_g13);
+            tm.set_display_state(DisplayState::ON);
+            tm.set_brightness(Brightness::L7);
+            tm.clear();
+            let mut show_colon = false;
 
             loop {
-                // println!("counter: {}", counter.to_string());
-                // println!("counter >> 5: {}", counter >> 5);
+                let mut pin_number = 0;
 
+                let t = time_now.now();
+                println!("--- time_now {:?}", t);
 
-              /*  tm.print_hex(0, &[counter + 0], false);
-                tm.print_hex(1, &[counter+ 1], true);
-                tm.print_hex(2, &[counter+ 2], false);
-                tm.print_hex(3, &[counter+ 3], false);*/
+                //todo remove this test block
+                let t = t + Duration::from_secs(3590);
+                println!("--- new_time_now {:?}", t);
 
-            //    counter += 1;
+                //todo remove this test block
 
-                let status = wifi_arc_clone.clone().lock().unwrap().get_status();
+                let seconds = t.as_secs() % 60;
+                let minutes = (t.as_secs() / 60) % 60;
+                let hours = (t.as_secs() / 60) / 60;
+                println!("--- duration {:02}:{:02}", minutes, seconds);
 
-                if let Status(
-                    ClientStatus::Started(ClientConnectionStatus::Connected(ClientIpStatus::Done(_))),
-                    _,
-                ) = status
-                {
-                    println!("Wifi connected");
+                if hours < 1 {
+                    let min_sec_t = format!("{:02}{:02}", minutes, seconds);
 
-                    let r = attohttpc::get(format!("{}/api/health", API_BASE_URL));
+                    show_colon = !show_colon;
 
-                    // let t = t.danger_accept_invalid_certs(true);
-                    // let t = t.danger_accept_invalid_hostnames(true);
-                    /*.danger_accept_invalid_certs(true).danger_accept_invalid_hostnames(true)*/
+                    tm.print_string(&min_sec_t, show_colon, None).unwrap();
 
-                    match r.send() {
-                        Ok(response) => {
-                            println!("Text of page is {}", response.text().unwrap());
-
-
-                            led_g32.set_high().unwrap();
-                            thread::sleep(Duration::from_secs(1));
-                            led_g32.set_low().unwrap();
-
-                            led_g25.set_high().unwrap();
-                            thread::sleep(Duration::from_secs(1));
-                            led_g25.set_low().unwrap();
-
-                            led_g26.set_high().unwrap();
-                            thread::sleep(Duration::from_secs(1));
-                            led_g26.set_low().unwrap();
-
-
-                            // buzzer_g25.set_high().unwrap();
-                            // thread::sleep(Duration::from_secs(3));
-                            // buzzer_g25.set_low().unwrap();
-
-                        }
-                        Err(err) => {
-                            println!("--- Couldn't fetch page, will sleep: {} {}", err.to_string(), API_BASE_URL);
-                            println!("Maybe check your system time if you have certificate validation issues?");
-                            // unsafe {
-                            //     esp_idf_sys::settimeofday(
-                            //         &timeval {
-                            //             tv_sec: todo!(),
-                            //             tv_usec: 0,
-                            //         },
-                            //         &timezone {
-                            //             tz_minuteswest: 0,
-                            //             tz_dsttime: 0,
-                            //         },
-                            //     );
-                            // }
-                        }
-                    }
-
-                    thread::sleep(Duration::from_secs(1));
+                    thread::sleep(Duration::from_millis(1000))
                 } else {
-                    println!("Unexpected Wifi status: {:?}", status);
+                    let hour_min_sec_t = format!(
+                        "{}{} {:02}{} {:02}{}",
+                        hours, "h", minutes, "n", seconds, "c"
+                    );
 
-                    thread::sleep(Duration::from_secs(3));
+                    let c = TM1637BannerAutoScrollConfig {
+                        scroll_min_char_count: tm.display_size + 1,
+                        delay_ms: 750,
+                        min_char_count_to_be_displayed: tm.display_size,
+                    };
+                    tm.print_string(&hour_min_sec_t, false, Some(&c)).unwrap();
+
+                    thread::sleep(Duration::from_millis(2000))
                 }
             }
-        })?;*/
+        });
+
+        thread::Builder::new()
+    .stack_size(32768)
+    .spawn(move || {
+        unsafe {
+            esp_idf_sys::vTaskPrioritySet(null_mut(), 1_u32 as c_uint);
+        }
+
+          //let mut led_g12 = pins.gpio12.into_output().unwrap();
+        // let mut buzzer_g25 = pins.gpio25.into_output().unwrap();
+
+        loop {
+            let status = wifi_arc_clone.clone().lock().unwrap().get_status();
+
+            if let Status(
+                ClientStatus::Started(ClientConnectionStatus::Connected(ClientIpStatus::Done(_))),
+                _,
+            ) = status
+            {
+                println!("Wifi connected");
+
+                let r = attohttpc::get(format!("{}/api/health", API_BASE_URL));
+
+                // let t = t.danger_accept_invalid_certs(true);
+                // let t = t.danger_accept_invalid_hostnames(true);
+                /*.danger_accept_invalid_certs(true).danger_accept_invalid_hostnames(true)*/
+
+                match r.send() {
+                    Ok(response) => {
+                        println!("Text of page is {}", response.text().unwrap());
+
+
+                        led_g32.set_high().unwrap();
+                        thread::sleep(Duration::from_secs(1));
+                        led_g32.set_low().unwrap();
+
+                        led_g25.set_high().unwrap();
+                        thread::sleep(Duration::from_secs(1));
+                        led_g25.set_low().unwrap();
+
+                        led_g26.set_high().unwrap();
+                        thread::sleep(Duration::from_secs(1));
+                        led_g26.set_low().unwrap();
+
+
+                        // buzzer_g25.set_high().unwrap();
+                        // thread::sleep(Duration::from_secs(3));
+                        // buzzer_g25.set_low().unwrap();
+
+                    }
+                    Err(err) => {
+                        println!("--- Couldn't fetch page, will sleep: {} {}", err.to_string(), API_BASE_URL);
+                        println!("Maybe check your system time if you have certificate validation issues?");
+                        // unsafe {
+                        //     esp_idf_sys::settimeofday(
+                        //         &timeval {
+                        //             tv_sec: todo!(),
+                        //             tv_usec: 0,
+                        //         },
+                        //         &timezone {
+                        //             tz_minuteswest: 0,
+                        //             tz_dsttime: 0,
+                        //         },
+                        //     );
+                        // }
+                    }
+                }
+
+                thread::sleep(Duration::from_secs(1));
+            } else {
+                println!("Unexpected Wifi status: {:?}", status);
+
+                thread::sleep(Duration::from_secs(3));
+            }
+        }
+    })?;
 
     Ok(())
 }
