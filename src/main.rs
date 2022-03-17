@@ -290,7 +290,7 @@ fn wifi_f(
     thread::Builder::new() /*.stack_size(32768)*/
         .spawn(move || {
             let mut tm = TM1637::new(&mut clk_g27, &mut dio_g13);
-            tm.set_display_state(DisplayState::ON);
+            tm.set_display_state(DisplayState::On);
             tm.set_brightness(Brightness::L7);
             tm.clear();
             let mut show_colon = false;
