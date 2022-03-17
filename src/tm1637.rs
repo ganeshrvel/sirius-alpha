@@ -255,12 +255,12 @@ where
         &mut self,
         string: &str,
         show_colon: bool,
-        auto_scroll: Option<&TM1637BannerAutoScrollConfig>,
+        auto_scroll: Option<&Tm1637BannerAutoScrollConfig>,
     ) -> Res<E> {
         let mut string_bucket: Option<Vec<String>> = None;
 
         // this will be only available when auto scroll has been approved for the input string
-        let mut approved_auto_scroll_config: Option<&TM1637BannerAutoScrollConfig> = None;
+        let mut approved_auto_scroll_config: Option<&Tm1637BannerAutoScrollConfig> = None;
 
         if let Some(c) = auto_scroll {
             if string.len() >= c.scroll_min_char_count as usize {
@@ -310,7 +310,7 @@ where
     fn get_auto_scrolling_banners(
         &self,
         string: &str,
-        config: &TM1637BannerAutoScrollConfig,
+        config: &Tm1637BannerAutoScrollConfig,
     ) -> anyhow::Result<Vec<String>> {
         if config.min_char_count_to_be_displayed > self.display_size {
             return Err(anyhow::Error::msg("[auto scroll] 'min_char_count_to_be_displayed' should not be greater than the 'display_size'"));
