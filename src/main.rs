@@ -23,79 +23,25 @@ mod tm1637;
 #[macro_use]
 extern crate dotenv_codegen;
 
-// use std::net::ToSocketAddrs;
-use std::fmt::format;
-use std::net::{TcpStream, ToSocketAddrs};
 use std::ptr::null_mut;
 use std::sync::Mutex;
-use std::time::Instant;
-use std::{sync::Arc, thread, thread::sleep, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 
-use anyhow::{bail, Result};
-// use embedded_svc::http::client::{Client, Request};
-// use embedded_svc::http::client::{Client, Request, Response};
-// use embedded_svc::http::status::OK;
-// use embedded_svc::http::{SendHeaders, Status as httpStatus};
-use embedded_svc::ping::Ping;
+use embedded_svc::wifi::Wifi;
 use embedded_svc::wifi::{
     ClientConfiguration, ClientConnectionStatus, ClientIpStatus, ClientStatus, Configuration,
     Status,
 };
-use embedded_svc::{ipv4, ipv4::Ipv4Addr, wifi::Wifi};
-// use esp_idf_hal::{delay::};
+use esp_idf_hal::gpio;
 use esp_idf_hal::peripherals::Peripherals;
-use esp_idf_hal::{delay, gpio};
-
-//use embedded_hal::blocking::delay::DelayUs;
-
-// use esp_idf_hal::peripherals::Peripherals;
-
-// use embedded_hal::blocking::delay::DelayMs;
-// use embedded_hal::digital::v2::OutputPin;
-
-// use esp_idf_hal::prelude::*;
-// use esp_idf_hal::{delay, gpio};
-//
-// use esp_idf_hal::adc;
-// use esp_idf_hal::i2c;
-// use esp_idf_hal::prelude::*;
-// use esp_idf_hal::spi;
-
-// use esp_idf_sys::esp;
-// use esp_idf_sys::{self, c_types};
 
 use embedded_hal::digital::v2::OutputPin;
 
-use embedded_hal::blocking::delay::DelayUs;
 use embedded_svc::sys_time::SystemTime;
-//
-// use esp_idf_hal::delay::{Ets, FreeRtos};
-//
-//
-// use esp_idf_hal::delay::TickType;
 
-// use embedded_hal::prelude::_embedded_hal_blocking_delay_DelayUs;
-// use esp_idf_hal::delay::Ets;
+use std::time::Instant;
 
-//
-// use embedded_hal::adc::OneShot;
-// use embedded_hal::blocking::delay::DelayMs;
-//
-// use embedded_svc::eth;
-// use embedded_svc::eth::{Eth, TransitionalState};
-// use embedded_svc::httpd::registry::*;
-// use embedded_svc::httpd::*;
-// use embedded_svc::io;
-// use embedded_svc::mqtt::client::{Publish, QoS};
-// use embedded_svc::sys_time::SystemTime;
-// use embedded_svc::timer::TimerService;
-// use embedded_svc::timer::*;
-// use embedded_svc::wifi::*;
-
-// use esp_idf_svc::http::client::{EspHttpClient, EspHttpClientConfiguration, EspHttpRequest};
-// use embedded_svc::event_bus::EventBus;
-// use embedded_svc::utils::nonblocking::Asyncify;
-// use esp_idf_svc::eventloop::{EspSubscription, System};
+use crate::tm1637::{Brightness, DisplayState, SegmentBits, Tm1637BannerAutoScrollConfig, TM1637};
 use esp_idf_svc::{
     // http::server::{EspHttpRequest, EspHttpServer},
     log::EspLogger,
@@ -106,13 +52,7 @@ use esp_idf_svc::{
 };
 use esp_idf_sys::c_types::c_uint;
 use esp_idf_sys::link_patches;
-// use esp_idf_sys::*;
-use crate::tm1637::{Brightness, DisplayState, SegmentBits, Tm1637BannerAutoScrollConfig, TM1637};
-use log::info;
 use serde::{Deserialize, Serialize};
-
-// use std::net::TcpStream;
-// use http::Request;
 
 const WIFI_SSID: &str = dotenv!("WIFI_SSID");
 
@@ -223,6 +163,10 @@ fn wifi_f(
 
     let wifi_arc_clone = wifi_arc.clone();
 
+    let shared_state = Arc::new(Mutex::new(0));
+    let shared_state_clone1 = shared_state.clone();
+    let shared_state_clone2 = shared_state.clone();
+
     unsafe {
         esp_idf_sys::esp_wifi_set_ps(esp_idf_sys::wifi_ps_type_t_WIFI_PS_NONE);
     }
@@ -277,12 +221,12 @@ fn wifi_f(
     let mut led_g25 = pins.gpio25.into_output().unwrap();
     let mut led_g26 = pins.gpio26.into_output().unwrap();
 
-    // let now = Instant::now();
-    // if now - t > Duration::from_millis(1000) {
-    //     t = now;
-    //     println!("{:?} thread 0", t);
-    //     //println!("thread 0");
-    // }
+    //  let now = Instant::now();
+    // // if now - t > Duration::from_millis(1000) {
+    // //     t = now;
+    // //     println!("{:?} thread 0", t);
+    // //     //println!("thread 0");
+    // // }
 
     let time_now = esp_idf_svc::systime::EspSystemTime {};
 
@@ -295,21 +239,33 @@ fn wifi_f(
             let mut show_colon = false;
 
             loop {
+               /// SHARED_MEMORY.with(|val| println!("--7seg thread shared_state {}", *val.borrow()));
+
+                // shared_state_clone1.lock().unwrap();
+
+                let mut ss = shared_state_clone1.lock().unwrap();
+
+                println!("--7seg thread old shared_state {}", *ss);
+
+                *ss = *ss + 1;
+
+                println!("--7seg thread new shared_state_clone1 {}", *ss);
+
                 let mut pin_number = 0;
 
                 let t = time_now.now();
-                println!("--- time_now {:?}", t);
+                //println!("--- time_now {:?}", t);
 
                 //todo remove this test block
                 let t = t + Duration::from_secs(3590);
-                println!("--- new_time_now {:?}", t);
+                //println!("--- new_time_now {:?}", t);
 
                 //todo remove this test block
 
                 let seconds = t.as_secs() % 60;
                 let minutes = (t.as_secs() / 60) % 60;
                 let hours = (t.as_secs() / 60) / 60;
-                println!("--- duration {:02}:{:02}", minutes, seconds);
+                // println!("--- duration {:02}:{:02}", minutes, seconds);
 
                 if hours < 1 {
                     let min_sec_t = format!("{:02}{:02}", minutes, seconds);
@@ -365,7 +321,29 @@ fn wifi_f(
 
                 match r.send() {
                     Ok(response) => {
-                        println!("Text of page is {}", response.text().unwrap());
+
+                        let mut ss = shared_state.lock().unwrap();
+
+                        println!("--wifi thread old shared_state {}", *ss);
+
+                        *ss = *ss + 1;
+
+                        println!("--wifi thread new shared_state {}", *ss);
+
+                        // SHARED_MEMORY.with(|val|
+                        //     println!("--wifi thread old shared_state {}", *val.borrow())
+                        // );
+                        //
+                        // SHARED_MEMORY.with(|val| {
+                        //     let v = *val.borrow();
+                        //     *val.borrow_mut() = v+1;
+                        // });
+                        //
+                        // SHARED_MEMORY.with(|val|
+                        //     println!("--wifi thread new shared_state {}", *val.borrow())
+                        // );
+
+                      //  println!("Text of page is {}", response.text().unwrap());
 
 
                         led_g32.set_high().unwrap();
@@ -379,6 +357,7 @@ fn wifi_f(
                         led_g26.set_high().unwrap();
                         thread::sleep(Duration::from_secs(1));
                         led_g26.set_low().unwrap();
+
 
 
                         // buzzer_g25.set_high().unwrap();
