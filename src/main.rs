@@ -16,70 +16,87 @@
     clippy::module_name_repetitions
 )]
 
+mod common;
+mod constants;
+mod helpers;
+mod macros;
 mod tm1637;
 
 #[macro_use]
 extern crate dotenv_codegen;
 
-// use esp_idf_svc::log::EspLogger;
-// use esp_idf_sys::link_patches;
-use log::LevelFilter;
+use constants::environment::Environment;
 
-use std::ptr::null_mut;
-use std::sync::{LockResult, Mutex};
-use std::{sync::Arc, thread, time::Duration};
-
+use crate::common::adaptors::network::WifiAdaptor;
+use anyhow::{anyhow, Error};
 use embedded_svc::wifi::Wifi;
-use embedded_svc::wifi::{
-    ClientConfiguration, ClientConnectionStatus, ClientIpStatus, ClientStatus, Configuration,
-    Status,
-};
-use esp_idf_hal::gpio;
-use esp_idf_hal::peripherals::Peripherals;
-
-use embedded_hal::digital::v2::OutputPin;
-
-use embedded_svc::sys_time::SystemTime;
-
-use std::time::Instant;
-
-use crate::tm1637::{Brightness, DisplayState, SegmentBits, Tm1637BannerAutoScrollConfig, TM1637};
-use esp_idf_svc::{
-    // http::server::{EspHttpRequest, EspHttpServer},
-    log::EspLogger,
-    netif::EspNetifStack,
-    nvs::EspDefaultNvs,
-    sysloop::EspSysLoopStack,
-    wifi::EspWifi,
-};
-use esp_idf_sys::c_types::c_uint;
 use esp_idf_sys::link_patches;
+use std::sync::Arc;
+use std::thread::sleep;
+use std::time::Duration;
 
-const WIFI_SSID: &str = dotenv!("WIFI_SSID");
+// use std::ptr::null_mut;
+// use std::sync::{LockResult, Mutex};
+// use std::{sync::Arc, thread, time::Duration};
+//
+// use embedded_svc::wifi::Wifi;
+// use embedded_svc::wifi::{
+//     ClientConfiguration, ClientConnectionStatus, ClientIpStatus, ClientStatus, Configuration,
+//     Status,
+// };
+// use esp_idf_hal::gpio;
+// use esp_idf_hal::peripherals::Peripherals;
+//
+// use embedded_hal::digital::v2::OutputPin;
+//
+// use embedded_svc::sys_time::SystemTime;
+//
+// use std::time::Instant;
+//
+// use crate::tm1637::{Brightness, DisplayState, SegmentBits, Tm1637BannerAutoScrollConfig, TM1637};
+// use esp_idf_sys::c_types::c_uint;
 
-const WIFI_PASS: &str = dotenv!("WIFI_PASS");
-
-const API_TOKEN_KEY: &str = dotenv!("API_TOKEN_KEY");
-
-const API_SECRET_TOKEN: &str = dotenv!("API_SECRET_TOKEN");
-
-const API_BASE_URL: &str = dotenv!("API_BASE_URL");
+use crate::constants::strings::Strings;
+use crate::helpers::logs::fern_log::setup_logging;
+// use esp_idf_svc::{
+//     netif::EspNetifStack,
+//     nvs::EspDefaultNvs,
+//     sysloop::EspSysLoopStack,
+//     //wifi::EspWifi,
+// };
 
 fn main() -> anyhow::Result<()> {
     link_patches();
 
-    //EspLogger::initialize_default();
+    #[allow(clippy::print_stdout)]
+    {
+        println!("initializing the logger...");
+    }
+    setup_logging()?;
 
-    let netif_stack = Arc::new(EspNetifStack::new()?);
-    let sys_loop_stack = Arc::new(EspSysLoopStack::new()?);
-    let default_nvs = Arc::new(EspDefaultNvs::new()?);
+    log::debug!("-----------------");
 
-    let _wifi = wifi_f(netif_stack, sys_loop_stack, default_nvs)?;
+    log::debug!("Launching {}...", Strings::APP_NAME);
+
+    if let Err(e) = run() {
+        log::error!("{:?}", e);
+
+        return Err(e);
+    }
 
     Ok(())
 }
 
-fn wifi_f(
+fn run() -> anyhow::Result<()> {
+    //todo move this to a new thread for wifi connections
+    // todo start another thread for the 7seg led displ
+    let wifi = WifiAdaptor::new()?;
+    wifi.connect()?;
+
+    Ok(())
+}
+
+/*fn wifi_f(
     netif_stack: Arc<EspNetifStack>,
     sys_loop_stack: Arc<EspSysLoopStack>,
     default_nvs: Arc<EspDefaultNvs>,
@@ -335,7 +352,8 @@ fn wifi_f(
         })?;
 
     Ok(())
-}
+    }
+ */
 // const fn check_status(status: &Status) -> bool {
 //     use ClientConnectionStatus::Connected;
 //     use ClientIpStatus::Done;

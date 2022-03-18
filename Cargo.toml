@@ -14,46 +14,28 @@ debug = true # Symbols are nice and they don't increase the size on Flash
 opt-level = "z"
 
 [dependencies]
-anyhow = "1.0.56"
-#embedded-svc = { version = "0.17.3", features = ["experimental"] }
-#esp-idf-svc = { version = "0.37.2", features = ["experimental"] }
 esp-idf-svc = "0.37.3"
 esp-idf-hal = { version = "0.33.2" }
 embedded-svc = "0.17.4"
 esp-idf-sys = { version = "0.30.6", features = ["binstart"] }
-#esp-idf-sys = { version = "0.30.6", features = ["binstart"] }
-#esp-idf-hal = "0.33.1"
-log = "0.4.14"
-strum_macros = "0.24.0"
-dotenv_codegen = "0.15.0"
+embedded-hal = "0.2.7"
+
 url = "2.2.2"
+
+attohttpc = { git = "https://github.com/killyourphone/attohttpc", branch = "esp32", default-features = false }
+
+fern = { version = "0.6.0", features = ["colored"] }
+log = "0.4.14"
+anyhow = "1.0.51"
+thiserror = "1.0.30"
+
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0.79"
 serde-value = "0.7.0"
-embedded-hal = "0.2.7"
 
-attohttpc = { git = "https://github.com/killyourphone/attohttpc", branch = "esp32", default-features = false }
-#ring = { git = "https://github.com/killyourphone/ring", branch = "esp32", features = ["size_optimized"] }
-#rustls = { version = "0.20.2", features = ["dangerous_configuration"] }
+dotenv_codegen = "0.15.0"
 
 [patch.crates-io]
-#cc = { git = "https://github.com/killyourphone/cc-rs", branch = "esp32" }
-# Overriding ureq is necessary for some reason (it's a build-time dep of embuild)
-#ureq = { git = "https://github.com/killyourphone/ureq", branch = "esp32" }
-
-
-#esp-idf-sys = { version = "0.30.6", features = ["binstart"] }
-#esp-idf-svc = "0.37.2"
-#embedded-svc = "0.17.2"
-#embedded-hal = "0.2"
-#embedded-graphics = "0.7"
-#display-interface = "0.4"
-#display-interface-spi = "0.4"
-#st7789 = "0.6"
-#ili9341 = { version = "0.5", git = "https://github.com/yuri91/ili9341-rs" }
-#ssd1306 = "0.7"
-#epd-waveshare = "0.5.0"
-
 
 [build-dependencies]
 embuild = "0.28"
