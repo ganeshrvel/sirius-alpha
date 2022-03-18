@@ -16,15 +16,17 @@
     clippy::module_name_repetitions
 )]
 
-// mod tm1637;
-// mod tmdd;
 mod tm1637;
 
 #[macro_use]
 extern crate dotenv_codegen;
 
+// use esp_idf_svc::log::EspLogger;
+// use esp_idf_sys::link_patches;
+use log::LevelFilter;
+
 use std::ptr::null_mut;
-use std::sync::Mutex;
+use std::sync::{LockResult, Mutex};
 use std::{sync::Arc, thread, time::Duration};
 
 use embedded_svc::wifi::Wifi;
@@ -52,7 +54,6 @@ use esp_idf_svc::{
 };
 use esp_idf_sys::c_types::c_uint;
 use esp_idf_sys::link_patches;
-use serde::{Deserialize, Serialize};
 
 const WIFI_SSID: &str = dotenv!("WIFI_SSID");
 
@@ -64,93 +65,18 @@ const API_SECRET_TOKEN: &str = dotenv!("API_SECRET_TOKEN");
 
 const API_BASE_URL: &str = dotenv!("API_BASE_URL");
 
-#[derive(Debug, Deserialize, Serialize, Clone, Eq, PartialEq)]
-pub struct SAlphaDeviceDetails {
-    pub device_name: String,
-    pub model: String,
-    pub device_id: String,
-    pub device_location: String,
-    pub device_sdk: String,
-    pub app_version: String,
-}
-
-// pub trait Serialize {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer;
-// }
-//
-// impl Serialize for SAlphaDeviceDetails {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer,
-//     {
-//         serializer.serialize_i32(*self)
-//     }
-// }
-
 fn main() -> anyhow::Result<()> {
     link_patches();
-    EspLogger::initialize_default();
+
+    //EspLogger::initialize_default();
 
     let netif_stack = Arc::new(EspNetifStack::new()?);
     let sys_loop_stack = Arc::new(EspSysLoopStack::new()?);
     let default_nvs = Arc::new(EspDefaultNvs::new()?);
 
-    let mut _wifi = wifi_f(netif_stack, sys_loop_stack, default_nvs)?;
-
-    // Print the startup message, then spin for eternity so that the server does not
-    // get dropped!
-    //print_startup_message();
-
-    // sleep(Duration::from_secs(7));
-    //
-    // let esp_client_config = EspHttpClientConfiguration{
-    //     buffer_size: None,
-    //     follow_redirects_policy: Default::default(),
-    //     use_global_ca_store: false,
-    //     crt_bundle_attach: None
-    // };
-    //
-
-    // sleep(Duration::from_secs(10));
-    //
-    // let mut esp_client = EspHttpClient::new_default()?;
-    // println!("{:?} --- status ", _wifi.get_status());
-    // //
-    // let mut esp_put = esp_client.put(String::from("https://www.google.com"))?;
-    //
-    // esp_put.set_header(API_TOKEN_KEY, API_SECRET_TOKEN);
-    //
-    // let r = SAlphaDeviceDetails {
-    //     device_name: "".to_string(),
-    //     model: "".to_string(),
-    //     device_id: "".to_string(),
-    //     device_location: "".to_string(),
-    //     device_sdk: "".to_string(),
-    //     app_version: "".to_string(),
-    // };
-    //
-    // let j = serde_json::to_string(&r)?;
-    //
-    // let esp_req = esp_put.send_str(&j)?;
-    //
-    // println!("{:?} --- esp_req status_message", esp_req.status_message());
-    //
-    // // esp_client.request()
-    // // esp_client.post()
-    //
-    // loop {
-    //     sleep(Duration::from_secs(2));
-    //     println!("{:?} --- status ", _wifi.get_status());
-    // }
+    let _wifi = wifi_f(netif_stack, sys_loop_stack, default_nvs)?;
 
     Ok(())
-}
-
-struct NoDelay {}
-impl embedded_hal::blocking::delay::DelayUs<u16> for NoDelay {
-    fn delay_us(&mut self, us: u16) {}
 }
 
 fn wifi_f(
@@ -239,17 +165,21 @@ fn wifi_f(
             let mut show_colon = false;
 
             loop {
-               /// SHARED_MEMORY.with(|val| println!("--7seg thread shared_state {}", *val.borrow()));
-
+                /// SHARED_MEMORY.with(|val| println!("--7seg thread shared_state {}", *val.borrow()));
                 // shared_state_clone1.lock().unwrap();
+                let mut ss = shared_state_clone1.lock();
+                match ss {
+                    Err(ee) => {
+                        println!("--7seg thread error {:?}", ee.to_string())
+                    }
+                    Ok(mut ssss) => {
+                        println!("--7seg thread old shared_state {}", *ssss);
 
-                let mut ss = shared_state_clone1.lock().unwrap();
+                        *ssss = *ssss + 1;
 
-                println!("--7seg thread old shared_state {}", *ss);
-
-                *ss = *ss + 1;
-
-                println!("--7seg thread new shared_state_clone1 {}", *ss);
+                        println!("--7seg thread new shared_state_clone1 {}", *ssss);
+                    }
+                }
 
                 let mut pin_number = 0;
 
@@ -294,103 +224,115 @@ fn wifi_f(
         });
 
     thread::Builder::new()
-    .stack_size(32768)
-    .spawn(move || {
-        unsafe {
-            esp_idf_sys::vTaskPrioritySet(null_mut(), 1_u32 as c_uint);
-        }
-
-          //let mut led_g12 = pins.gpio12.into_output().unwrap();
-        // let mut buzzer_g25 = pins.gpio25.into_output().unwrap();
-
-        loop {
-            let status = wifi_arc_clone.clone().lock().unwrap().get_status();
-
-            if let Status(
-                ClientStatus::Started(ClientConnectionStatus::Connected(ClientIpStatus::Done(_))),
-                _,
-            ) = status
-            {
-                println!("Wifi connected");
-
-                let r = attohttpc::get(format!("{}/api/health", API_BASE_URL));
-
-                // let t = t.danger_accept_invalid_certs(true);
-                // let t = t.danger_accept_invalid_hostnames(true);
-                /*.danger_accept_invalid_certs(true).danger_accept_invalid_hostnames(true)*/
-
-                match r.send() {
-                    Ok(response) => {
-
-                        let mut ss = shared_state.lock().unwrap();
-
-                        println!("--wifi thread old shared_state {}", *ss);
-
-                        *ss = *ss + 1;
-
-                        println!("--wifi thread new shared_state {}", *ss);
-
-                        // SHARED_MEMORY.with(|val|
-                        //     println!("--wifi thread old shared_state {}", *val.borrow())
-                        // );
-                        //
-                        // SHARED_MEMORY.with(|val| {
-                        //     let v = *val.borrow();
-                        //     *val.borrow_mut() = v+1;
-                        // });
-                        //
-                        // SHARED_MEMORY.with(|val|
-                        //     println!("--wifi thread new shared_state {}", *val.borrow())
-                        // );
-
-                      //  println!("Text of page is {}", response.text().unwrap());
-
-
-                        led_g32.set_high().unwrap();
-                        thread::sleep(Duration::from_secs(1));
-                        led_g32.set_low().unwrap();
-
-                        led_g25.set_high().unwrap();
-                        thread::sleep(Duration::from_secs(1));
-                        led_g25.set_low().unwrap();
-
-                        led_g26.set_high().unwrap();
-                        thread::sleep(Duration::from_secs(1));
-                        led_g26.set_low().unwrap();
-
-
-
-                        // buzzer_g25.set_high().unwrap();
-                        // thread::sleep(Duration::from_secs(3));
-                        // buzzer_g25.set_low().unwrap();
-
-                    }
-                    Err(err) => {
-                        println!("--- Couldn't fetch page, will sleep: {} {}", err.to_string(), API_BASE_URL);
-                        println!("Maybe check your system time if you have certificate validation issues?");
-                        // unsafe {
-                        //     esp_idf_sys::settimeofday(
-                        //         &timeval {
-                        //             tv_sec: todo!(),
-                        //             tv_usec: 0,
-                        //         },
-                        //         &timezone {
-                        //             tz_minuteswest: 0,
-                        //             tz_dsttime: 0,
-                        //         },
-                        //     );
-                        // }
-                    }
-                }
-
-                thread::sleep(Duration::from_secs(1));
-            } else {
-                println!("Unexpected Wifi status: {:?}", status);
-
-                thread::sleep(Duration::from_secs(3));
+        .stack_size(32768)
+        .spawn(move || {
+            unsafe {
+                esp_idf_sys::vTaskPrioritySet(null_mut(), 1_u32 as c_uint);
             }
-        }
-    })?;
+
+            //let mut led_g12 = pins.gpio12.into_output().unwrap();
+            // let mut buzzer_g25 = pins.gpio25.into_output().unwrap();
+
+            loop {
+                let status = wifi_arc_clone.clone().lock().unwrap().get_status();
+
+                if let Status(
+                    ClientStatus::Started(ClientConnectionStatus::Connected(ClientIpStatus::Done(_))),
+                    _,
+                ) = status
+                {
+                    println!("Wifi connected");
+
+                    let r = attohttpc::get(format!("{}/api/health", API_BASE_URL));
+
+
+                    // let t = t.danger_accept_invalid_certs(true);
+                    // let t = t.danger_accept_invalid_hostnames(true);
+                    /*.danger_accept_invalid_certs(true).danger_accept_invalid_hostnames(true)*/
+
+                    match r.send() {
+                        Ok(response) => {
+
+
+
+                             let mut ss = shared_state.lock();
+
+                            match ss {
+                                Err (ee) => {
+                                    println!("--wifi thread error {:?}", ee.to_string())
+                                }
+                                Ok  (mut ssss) => {
+                                    println!("--wifi thread old shared_state {}", *ssss);
+
+                                    *ssss = *ssss + 1;
+
+                                    println!("--wifi thread new shared_state {}", *ssss);
+                                }
+                            }
+
+
+
+                            // SHARED_MEMORY.with(|val|
+                            //     println!("--wifi thread old shared_state {}", *val.borrow())
+                            // );
+                            //
+                            // SHARED_MEMORY.with(|val| {
+                            //     let v = *val.borrow();
+                            //     *val.borrow_mut() = v+1;
+                            // });
+                            //
+                            // SHARED_MEMORY.with(|val|
+                            //     println!("--wifi thread new shared_state {}", *val.borrow())
+                            // );
+
+                             println!("-- response Text of page is {}", response.text().unwrap());
+
+
+                            led_g32.set_high().unwrap();
+                            thread::sleep(Duration::from_secs(1));
+                            led_g32.set_low().unwrap();
+
+                            led_g25.set_high().unwrap();
+                            thread::sleep(Duration::from_secs(1));
+                            led_g25.set_low().unwrap();
+
+                            led_g26.set_high().unwrap();
+                            thread::sleep(Duration::from_secs(1));
+                            led_g26.set_low().unwrap();
+
+
+
+                            // buzzer_g25.set_high().unwrap();
+                            // thread::sleep(Duration::from_secs(3));
+                            // buzzer_g25.set_low().unwrap();
+
+                        }
+                        Err(err) => {
+                            println!("--- Couldn't fetch page, will sleep: {} {}", err.to_string(), API_BASE_URL);
+                            println!("Maybe check your system time if you have certificate validation issues?");
+                            // unsafe {
+                            //     esp_idf_sys::settimeofday(
+                            //         &timeval {
+                            //             tv_sec: todo!(),
+                            //             tv_usec: 0,
+                            //         },
+                            //         &timezone {
+                            //             tz_minuteswest: 0,
+                            //             tz_dsttime: 0,
+                            //         },
+                            //     );
+                            // }
+                        }
+                    }
+
+                    thread::sleep(Duration::from_secs(1));
+                } else {
+                    println!("Unexpected Wifi status: {:?}", status);
+
+                    thread::sleep(Duration::from_secs(3));
+                }
+            }
+        })?;
 
     Ok(())
 }
