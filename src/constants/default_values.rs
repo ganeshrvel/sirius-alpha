@@ -9,5 +9,8 @@ pub struct DefaultValues<'a> {
 }
 
 impl DefaultValues<'static> {
-    pub const CONTINUOUS_SCANNING_DELAY: u64 = 2000;
+    pub const API_TIMEOUT: u64 = 10000;
+    pub const WIFI_RECONNECTION_DELAY: u64 = 4000;
+    pub const NET_CONNECTION_MANAGER_THREAD_DELAY: u64 = 4000;
+    pub const APIS_THREAD_DELAY: u64 = 3000; //todo change to 30000
 }

@@ -13,11 +13,15 @@
     clippy::implicit_return,
     clippy::similar_names,
     clippy::blanket_clippy_restriction_lints,
-    clippy::module_name_repetitions
+    clippy::module_name_repetitions,
+    clippy::shadow_reuse,
+    clippy::as_conversions,
+    clippy::decimal_literal_representation
 )]
 
 mod common;
 mod constants;
+mod features;
 mod helpers;
 mod macros;
 mod tm1637;
@@ -26,12 +30,17 @@ mod tm1637;
 extern crate dotenv_codegen;
 
 use constants::environment::Environment;
+use std::ptr::null_mut;
 
 use crate::common::adaptors::network::WifiAdaptor;
+use crate::common::errors::common_errors::CommonError;
+use crate::constants::env_values::EnvValues;
 use anyhow::{anyhow, Error};
-use embedded_svc::wifi::Wifi;
+use embedded_svc::wifi::{ClientConnectionStatus, ClientIpStatus, ClientStatus, Status, Wifi};
+use esp_idf_sys::c_types::c_uint;
 use esp_idf_sys::link_patches;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -57,13 +66,8 @@ use std::time::Duration;
 // use esp_idf_sys::c_types::c_uint;
 
 use crate::constants::strings::Strings;
+use crate::features::network_feature::NetworkFeature;
 use crate::helpers::logs::fern_log::setup_logging;
-// use esp_idf_svc::{
-//     netif::EspNetifStack,
-//     nvs::EspDefaultNvs,
-//     sysloop::EspSysLoopStack,
-//     //wifi::EspWifi,
-// };
 
 fn main() -> anyhow::Result<()> {
     link_patches();
@@ -88,12 +92,32 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn run() -> anyhow::Result<()> {
-    //todo move this to a new thread for wifi connections
     // todo start another thread for the 7seg led displ
-    let wifi = WifiAdaptor::new()?;
-    wifi.connect()?;
+    let wifi_adaptor = WifiAdaptor::new()?;
+    let wifi_adaptor_arc = Arc::new(Mutex::new(wifi_adaptor));
 
-    Ok(())
+    // thread::spawn(move || {
+    //     //todo move this to the wifi api hitting thread
+    //     // there if status is connected then hit the end point else keep connecting and spitting out the shared error
+    //     wifi_arc_clone
+    //         .lock()
+    //         .map_err(|e| CommonError::MutexGuard("E0007".to_owned(), e.to_string()))
+    //         .unwrap()
+    //         .connect();
+    // });
+
+    let net_features = NetworkFeature::new();
+    NetworkFeature::start(&Arc::new(Mutex::new(net_features)), &wifi_adaptor_arc)?;
+
+    // for n in net_handles {
+    //     if let Err(e) = Ok(n) {
+    //         return Err(CommonError::Thread("E0015".to_owned(), e).into());
+    //     }
+    // }
+
+    loop {
+        thread::sleep(Duration::from_millis(5000));
+    }
 }
 
 /*fn wifi_f(

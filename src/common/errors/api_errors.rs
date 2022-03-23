@@ -1,30 +1,22 @@
-use std::fmt::{Display, Formatter};
+use thiserror::Error;
 
-use attohttpc::StatusCode;
+#[derive(Error, Debug)]
+pub enum ApiClientError {
+    #[error("[0:?] an API client error occured: {1:?}")]
+    Response(String, String),
 
-// #[derive(Debug)]
-// pub enum ApiErrors {
-//     _Http(StatusCode, String),
-//
-//     InternalServerError(String),
-//
-//     BadRequest(String),
-// }
-//
-// impl ApiErrors {
-//     pub fn message(&self) -> String {
-//         match self {
-//             Self::InternalServerError(e) => format!(r"An Internal Server Error occured: {:?}", e),
-//             Self::BadRequest(e) => format!(r"A Bad Request Error occured: {:?}", e),
-//             Self::_Http(status_code, e) => {
-//                 format!(r"A HTTP error occured: {:?} | {:?}", status_code, e)
-//             }
-//         }
-//     }
-// }
-//
-// impl Display for ApiErrors {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "{:?}", self)
-//     }
-// }
+    #[error("[0:?] an Json Parsing error occured: {1:?}")]
+    JsonParsing(String, String),
+}
+
+#[derive(Error, Debug)]
+pub enum ApiResponseError {
+    #[error("[0:?] an Internal Server error occured: {1:?}. Error: {1:?}, Message: {2:?}")]
+    InternalServerError(String, String, String),
+
+    #[error("[0:?] a Bad Request error occured. Error: {1:?}, Message: {2:?}")]
+    BadRequest(String, String, String),
+
+    #[error("[0:?] a 404 error error: {1:?}. Error: {1:?}, Message: {2:?}")]
+    NotFound(String, String, String),
+}

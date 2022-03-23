@@ -10,4 +10,10 @@ pub enum WifiError {
 
     #[error("[0:?] a wifi configuration error occurred {1:?}")]
     Configuration(String, String),
+
+    #[error("[0:?] network connection not available")]
+    NotConnected(String),
+
+    #[error("[0:?] unable to resolve a network IP address")]
+    UnresolvedIp(String),
 }
