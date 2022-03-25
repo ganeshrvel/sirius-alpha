@@ -36,10 +36,10 @@ impl SiriusProximaClient {
                 let resp_text_ok = match resp_text {
                     Ok(s) => s,
                     Err(e) => {
-                        error!("[E0021][SiriusProximaClient] {}", e.to_string());
+                        error!("[E0021a][SiriusProximaClient] {}", e.to_string());
 
                         return Err(
-                            ApiClientError::Response("E0021".to_owned(), e.to_string()).into()
+                            ApiClientError::Response("E0021b".to_owned(), e.to_string()).into()
                         );
                     }
                 };
@@ -51,18 +51,16 @@ impl SiriusProximaClient {
                 }
             }
             Err(e) => {
-                error!("[E0020][SiriusProximaClient] {}", e.to_string());
+                error!("[E0020a][SiriusProximaClient] {}", e.to_string());
 
                 let err_str = e.to_string();
                 let err_kind = e.into_kind();
                 return match err_kind {
                     attohttpc::ErrorKind::Io(ref e) => {
-                        Err(
-                            ApiResponseError::SiteNotFound("E0025".to_owned(), err_str).into()
-                        )
+                        Err(ApiResponseError::SiteNotFound("E0025".to_owned(), err_str).into())
                     }
-                    _ => Err(ApiClientError::Response("E0020".to_owned(), err_str).into()),
-                }
+                    _ => Err(ApiClientError::Response("E0020b".to_owned(), err_str).into()),
+                };
             }
         };
 
@@ -72,10 +70,10 @@ impl SiriusProximaClient {
                 let resp_json_ok = match resp_json {
                     Ok(s) => s,
                     Err(e) => {
-                        error!("[E0022][SiriusProximaClient] {}", e.to_string());
+                        error!("[E0022a][SiriusProximaClient] {}", e.to_string());
 
                         return Err(
-                            ApiClientError::JsonParsing("E0022".to_owned(), e.to_string()).into(),
+                            ApiClientError::JsonParsing("E0022b".to_owned(), e.to_string()).into(),
                         );
                     }
                 };
@@ -87,10 +85,10 @@ impl SiriusProximaClient {
                 let resp_json_ok = match resp_json {
                     Ok(s) => s,
                     Err(e) => {
-                        error!("[E0023][SiriusProximaClient] {}", e.to_string());
+                        error!("[E0023a][SiriusProximaClient] {}", e.to_string());
 
                         return Err(
-                            ApiClientError::JsonParsing("E0023".to_owned(), e.to_string()).into(),
+                            ApiClientError::JsonParsing("E0023b".to_owned(), e.to_string()).into(),
                         );
                     }
                 };
@@ -98,20 +96,20 @@ impl SiriusProximaClient {
                 let resp_json_err = resp_json_ok.error.unwrap_or_default();
                 let resp_json_message = resp_json_ok.message.unwrap_or_default();
 
-                error!("[E0024][SiriusProximaClient] Received an API response error. Error: {}, Message: {}", resp_json_err,resp_json_message );
+                error!("[E0024a][SiriusProximaClient] Received an API response error. Error: {}, Message: {}", resp_json_err,resp_json_message );
                 let mapped_res_error = match status_code {
                     StatusCode::BAD_REQUEST => ApiResponseError::BadRequest(
-                        "E0024".to_owned(),
+                        "E0024b".to_owned(),
                         resp_json_err,
                         resp_json_message,
                     ),
                     StatusCode::NOT_FOUND => ApiResponseError::NotFound(
-                        "E0024".to_owned(),
+                        "E0024c".to_owned(),
                         resp_json_err,
                         resp_json_message,
                     ),
                     _ => ApiResponseError::InternalServerError(
-                        "E0024".to_owned(),
+                        "E0024d".to_owned(),
                         resp_json_err,
                         resp_json_message,
                     ),

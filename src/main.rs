@@ -24,13 +24,9 @@ mod constants;
 mod features;
 mod helpers;
 mod macros;
-mod tm1637;
 
 #[macro_use]
 extern crate dotenv_codegen;
-
-use constants::environment::Environment;
-use std::ptr::null_mut;
 
 use crate::common::adaptors::network::WifiAdaptor;
 use crate::common::errors::common_errors::CommonError;
