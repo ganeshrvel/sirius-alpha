@@ -113,21 +113,6 @@ impl NetworkFeature {
             return Err(WifiError::UnresolvedIp("E0018".to_owned()).into());
         }
 
-        // let req = attohttpc::get(format!("{}/api/health", EnvValues::API_BASE_URL));
-        // let req = req.danger_accept_invalid_certs(true);
-        // let req = req.danger_accept_invalid_hostnames(true);
-        //
-        // match req.send() {
-        //     Ok(response) => {
-        //         println!("response text: {:?}", response.text())
-        //     }
-        //     Err(err) => {
-        //         println!("response error: {:?}", err);
-        //
-        //         return Err(ApiClientError::Unknown("E0019".to_owned(), err.to_string()).into());
-        //     }
-        // }
-
         let resp = SIRIUS_PROXIMA_CLIENT.get::<Health>("/api/health");
 
         match &resp {
@@ -139,23 +124,26 @@ impl NetworkFeature {
                 match e.downcast_ref::<ApiResponseError>() {
                     None => {}
                     Some(ApiResponseError::InternalServerError(_, _, _)) => {
-                        unimplemented!(); //todo set the tm1673
+                        // unimplemented!(); //todo set the tm1673
                     }
                     Some(ApiResponseError::NotFound(_, _, _)) => {
-                        unimplemented!(); //todo set the tm1673
+                        // unimplemented!(); //todo set the tm1673
                     }
                     Some(ApiResponseError::BadRequest(_, _, _)) => {
-                        unimplemented!(); //todo set the tm1673
+                        //   unimplemented!(); //todo set the tm1673
+                    }
+                    Some(ApiResponseError::SiteNotFound(_, _,)) => {
+                        //   unimplemented!(); //todo set the tm1673
                     }
                 };
 
                 match e.downcast_ref::<ApiClientError>() {
                     None => {}
                     Some(ApiClientError::Response(_, _)) => {
-                        unimplemented!(); //todo
+                        // unimplemented!(); //todo set the tm1673, not reacheable
                     }
                     Some(ApiClientError::JsonParsing(_, _)) => {
-                        unimplemented!(); //todo
+                        // unimplemented!(); //todo
                     }
                 }
             }

@@ -53,7 +53,16 @@ impl SiriusProximaClient {
             Err(e) => {
                 error!("[E0020][SiriusProximaClient] {}", e.to_string());
 
-                return Err(ApiClientError::Response("E0020".to_owned(), e.to_string()).into());
+                let err_str = e.to_string();
+                let err_kind = e.into_kind();
+                return match err_kind {
+                    attohttpc::ErrorKind::Io(ref e) => {
+                        Err(
+                            ApiResponseError::SiteNotFound("E0025".to_owned(), err_str).into()
+                        )
+                    }
+                    _ => Err(ApiClientError::Response("E0020".to_owned(), err_str).into()),
+                }
             }
         };
 

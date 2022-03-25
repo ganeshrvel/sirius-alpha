@@ -30,10 +30,12 @@ pub struct TM1637<'a, CLK, DIO> {
     dio: &'a mut DIO,
     pub(crate) display_size: u8,
     delay_fn: delay::FreeRtos,
+
     /// Representation of the display state in bits for the TM1637.
     /// Bits 7-4 are zero. Later the "display control"-command prefix will be there.
     /// Bits 3-0 are for display on/off and brightness.
     brightness: u8,
+
     delay_us: u16,
 }
 
@@ -577,15 +579,15 @@ pub enum SegmentBits {
 #[repr(u8)]
 pub enum NumberCharBits {
     Zero = 0b00111111,
-    One = 0b00000110,
-    Two = 0b01011011,
-    Three = 0b01001111,
-    Four = 0b01100110,
-    Five = 0b01101101,
-    Six = 0b01111101,
-    Seven = 0b00000111,
-    Eight = 0b01111111,
-    Nine = 0b01101111,
+    One = 0b0000_0110,
+    Two = 0b0101_1011,
+    Three = 0b0100_1111,
+    Four = 0b0110_0110,
+    Five = 0b0110_1101,
+    Six = 0b0111_1101,
+    Seven = 0b0000_0111,
+    Eight = 0b0111_1111,
+    Nine = 0b0110_1111,
 }
 
 /// Maps a character to its closest possible representation on a 7-segment display.
