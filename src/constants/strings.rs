@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 
-#[non_exhaustive]
 #[derive(Debug)]
 pub struct Strings<'a> {
     /// https://stackoverflow.com/questions/40484154/parameter-a-is-never-used-error-when-a-is-used-in-type-parameter-bound

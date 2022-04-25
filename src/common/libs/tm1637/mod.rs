@@ -29,7 +29,7 @@ pub struct Tm1637BannerAutoScrollConfig {
     pub(crate) min_char_count_to_be_displayed: u8,
 }
 
-pub struct TM1637<'a, CLK, DIO> {
+pub struct Tm1637<'a, CLK, DIO> {
     clk: &'a mut CLK,
     dio: &'a mut DIO,
     pub(crate) display_size: u8,
@@ -43,7 +43,7 @@ pub struct TM1637<'a, CLK, DIO> {
     delay_us: u16,
 }
 
-impl<'a, CLK, DIO, E> TM1637<'a, CLK, DIO>
+impl<'a, CLK, DIO, E> Tm1637<'a, CLK, DIO>
 where
     CLK: OutputPin<Error = E>,
     DIO: InputPin<Error = E> + OutputPin<Error = E>,
@@ -56,8 +56,7 @@ where
             delay_fn: delay::FreeRtos {},
             brightness: DisplayState::On as u8 | Brightness::L7 as u8,
 
-            #[allow(clippy::unseparated_literal_suffix)]
-            delay_us: 100u16,
+            delay_us: 100_u16,
         }
     }
 
@@ -142,9 +141,7 @@ where
         let chars: Vec<u8> = [chr]
             .iter()
             .copied()
-            .map(|c| {
-                let mut c = c;
-
+            .map(|mut c| {
                 if address == 1 && show_colon {
                     c |= SpecialCharBits::ColonOrDot as u8;
                 }
@@ -161,6 +158,7 @@ where
         string: &str,
         show_colon: bool,
         auto_scroll: Option<&Tm1637BannerAutoScrollConfig>,
+        delay_ms: u16,
     ) -> anyhow::Result<(), TmError<E>> {
         let mut string_bucket: Option<Vec<String>> = None;
 
@@ -201,6 +199,8 @@ where
                 if let Some(ac) = approved_auto_scroll_config {
                     self.set_delay_ms(ac.delay_ms);
                 }
+
+                self.set_delay_ms(delay_ms);
             }
         }
 
@@ -277,7 +277,7 @@ where
     /// This uses fixed address mode (see data sheet) internally to write data to
     /// a specific position of the display.
     /// Position is 0, 1, 2, or 3.
-    pub fn write_segment_raw(
+    pub fn _write_segment_raw(
         &mut self,
         segments: u8,
         position: u8,
@@ -335,6 +335,7 @@ where
         // Write the remaining data bytes
         // TM1637 does auto increment internally
         for i in 0..n {
+            #[allow(clippy::indexing_slicing)]
             self.write_byte_and_wait_ack(segments[i as usize])?;
         }
         self.stop()?;
@@ -363,7 +364,6 @@ where
         let mut data = byte;
 
         // 8 bits
-        #[allow(clippy::separated_literal_suffix)]
         for _ in 0_u8..8_u8 {
             // CLK low
             self.clk.set_low()?;
@@ -384,7 +384,6 @@ where
 
             // CLK high
             self.clk.set_high()?;
-
             self.set_delay_us();
 
             // shift to next bit
@@ -400,11 +399,8 @@ where
     fn start(&mut self) -> anyhow::Result<(), TmError<E>> {
         self.dio.set_high()?;
         self.clk.set_high()?;
-
         self.set_delay_us();
-
         self.dio.set_low()?;
-
         self.set_delay_us();
 
         // transition from high to low on DIO while CLK is high
@@ -419,11 +415,8 @@ where
     fn stop(&mut self) -> anyhow::Result<(), TmError<E>> {
         self.dio.set_low()?;
         self.clk.set_high()?;
-
         self.set_delay_us();
-
         self.dio.set_high()?;
-
         self.set_delay_us();
 
         Ok(())
@@ -433,25 +426,20 @@ where
     fn recv_ack(&mut self) -> anyhow::Result<(), TmError<E>> {
         self.clk.set_low()?;
         self.dio.set_low()?;
-
         self.set_delay_us();
-
         self.clk.set_high()?;
 
         let is_dio_low: bool = self.dio.is_low()?;
 
         // wait a few cycles for ACK to be more fail safe
-        #[allow(clippy::separated_literal_suffix)]
-        for _ in 0..10 {
+        for _ in 0_i32..10_i32 {
             if is_dio_low {
                 break;
             }
         }
 
         self.clk.set_low()?;
-
         self.dio.set_low()?;
-
         self.set_delay_us();
 
         Ok(())

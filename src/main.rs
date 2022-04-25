@@ -16,7 +16,13 @@
     clippy::module_name_repetitions,
     clippy::shadow_reuse,
     clippy::as_conversions,
-    clippy::decimal_literal_representation
+    clippy::separated_literal_suffix,
+    clippy::decimal_literal_representation,
+    clippy::too_many_lines,
+    clippy::integer_division,
+    clippy::modulo_arithmetic,
+    clippy::unused_self,
+    clippy::integer_arithmetic
 )]
 
 mod common;
@@ -30,36 +36,20 @@ extern crate dotenv_codegen;
 
 use crate::common::adaptors::network::WifiAdaptor;
 use crate::common::errors::common_errors::CommonError;
+use crate::common::errors::setup_errors::SetupError;
+use crate::common::libs::tm1637::mappings::{Brightness, DisplayState};
+use crate::common::libs::tm1637::{Tm1637, Tm1637BannerAutoScrollConfig};
 use crate::constants::env_values::EnvValues;
-use anyhow::{anyhow, Error};
-use embedded_svc::wifi::{ClientConnectionStatus, ClientIpStatus, ClientStatus, Status, Wifi};
-use esp_idf_sys::c_types::c_uint;
+
+use embedded_svc::sys_time::SystemTime;
+use esp_idf_hal::gpio;
+use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_sys::link_patches;
+use log::{error, warn};
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::thread::sleep;
 use std::time::Duration;
-
-// use std::ptr::null_mut;
-// use std::sync::{LockResult, Mutex};
-// use std::{sync::Arc, thread, time::Duration};
-//
-// use embedded_svc::wifi::Wifi;
-// use embedded_svc::wifi::{
-//     ClientConfiguration, ClientConnectionStatus, ClientIpStatus, ClientStatus, Configuration,
-//     Status,
-// };
-// use esp_idf_hal::gpio;
-// use esp_idf_hal::peripherals::Peripherals;
-//
-// use embedded_hal::digital::v2::OutputPin;
-//
-// use embedded_svc::sys_time::SystemTime;
-//
-// use std::time::Instant;
-//
-// use crate::tm1637::{Brightness, DisplayState, SegmentBits, Tm1637BannerAutoScrollConfig, TM1637};
-// use esp_idf_sys::c_types::c_uint;
 
 use crate::constants::strings::Strings;
 use crate::features::network_feature::NetworkFeature;
@@ -88,28 +78,162 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn run() -> anyhow::Result<()> {
-    // todo start another thread for the 7seg led displ
+    let system_time = esp_idf_svc::systime::EspSystemTime {};
+
     let wifi_adaptor = WifiAdaptor::new()?;
     let wifi_adaptor_arc = Arc::new(Mutex::new(wifi_adaptor));
 
-    // thread::spawn(move || {
-    //     //todo move this to the wifi api hitting thread
-    //     // there if status is connected then hit the end point else keep connecting and spitting out the shared error
-    //     wifi_arc_clone
-    //         .lock()
-    //         .map_err(|e| CommonError::MutexGuard("E0007".to_owned(), e.to_string()))
-    //         .unwrap()
-    //         .connect();
-    // });
+    let (seg_display_tx, seg_display_rx): (Sender<Option<String>>, Receiver<Option<String>>) =
+        std::sync::mpsc::channel();
+
+    let segement_display_message: Option<String> = None;
+    let segement_display_message_arc = Arc::new(Mutex::new(segement_display_message));
+    let segement_display_message_arc_clone = Arc::clone(&segement_display_message_arc);
 
     let net_features = NetworkFeature::new();
-    NetworkFeature::start(&Arc::new(Mutex::new(net_features)), &wifi_adaptor_arc)?;
+    NetworkFeature::start(
+        &Arc::new(Mutex::new(net_features)),
+        &wifi_adaptor_arc,
+        seg_display_tx,
+    )?;
 
-    // for n in net_handles {
-    //     if let Err(e) = Ok(n) {
-    //         return Err(CommonError::Thread("E0015".to_owned(), e).into());
-    //     }
-    // }
+    thread::Builder::new().spawn(move || loop {
+        match seg_display_rx.recv() {
+            Ok(msg) => match segement_display_message_arc_clone.lock() {
+                Ok(d) => {
+                    let mut seg_text = d;
+
+                    *seg_text = msg;
+                }
+                Err(e) => {
+                    error!("[E0029a][seg_display_rx thread] {}", e.to_string());
+                }
+            },
+            Err(e) => {
+                error!("[E0029b][seg_display_rx thread] {}", e.to_string());
+            }
+        }
+    })?;
+
+    let peripherals = Peripherals::take();
+    match peripherals {
+        None => {
+            return Err(SetupError::Peripherals("E0030b", "'peripherals' is empty").into());
+        }
+        Some(peripherals) => {
+            let pins: gpio::Pins = peripherals.pins;
+            let mut clk_g27 = pins.gpio27.into_input_output()?;
+            let mut dio_g13 = pins.gpio13.into_input_output()?;
+
+            thread::Builder::new().spawn(move || {
+                let mut tm = Tm1637::new(&mut clk_g27, &mut dio_g13);
+                tm.set_display_state(DisplayState::On);
+                tm.set_brightness(Brightness::L7);
+                let tm_clear_res = tm.clear();
+                if let Err(e) = tm_clear_res {
+                    error!("[E0031a][peripherals] {}", e.to_string());
+                }
+
+                // show the texts of the segment display after the defined number of loop iterations
+                // this value is `5` when running time is less than `1 hour`
+                // and `2` when running time is more than `1 hour`
+                let mut min_timer_seconds_to_display_size = 5_i32;
+
+                // if the [print_seg_text_on_display_count] is in multiples of[print_seg_text_on_display_cutoff_count] then print the [segement_display_message] to the display. This is to avoid error texts from taking hogging up the display
+                let mut min_timer_seconds_to_display_counter = 0_i32;
+
+                // for some strage reason adding a [thread::delay] is not freeing the [segement_display_message] hence not able to recieve messages via the [seg_display_rx] channel. This is a hack, a way around, it works and need to investigate why this is acting weird
+                let mut next_delay = 0;
+
+                let mut show_colon = false;
+
+                loop {
+                    thread::sleep(Duration::from_millis(next_delay));
+
+                    let seg_text_res = segement_display_message_arc.lock();
+                    match seg_text_res {
+                        Ok(mut seg_text) => {
+                            if let Some(msg) = &mut *seg_text {
+                                if min_timer_seconds_to_display_counter
+                                    % min_timer_seconds_to_display_size
+                                    == 0
+                                {
+                                    let c = Tm1637BannerAutoScrollConfig {
+                                        scroll_min_char_count: tm.display_size + 1,
+                                        delay_ms: 750,
+                                        min_char_count_to_be_displayed: tm.display_size,
+                                    };
+
+                                    let tm_print_res = tm.print_string(msg, false, Some(&c), 0);
+                                    if let Err(e) = tm_print_res {
+                                        error!("[E0031b][peripherals] {}", e.to_string());
+                                    }
+
+                                    *seg_text = None;
+                                    min_timer_seconds_to_display_counter += 1_i32;
+                                    next_delay = 2000;
+
+                                    continue;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!("[E0031c][peripherals] {}", e.to_string());
+                        }
+                    }
+
+                    min_timer_seconds_to_display_counter += 1_i32;
+                    let time_now = system_time.now();
+
+                    let seconds = time_now.as_secs() % 60;
+                    let minutes = (time_now.as_secs() / 60) % 60;
+                    let hours = (time_now.as_secs() / 60) / 60;
+
+                    // when running time is less than 1 hour then just show `00:00`
+                    if hours < 1 {
+                        let min_sec_t = format!("{:02}{:02}", minutes, seconds);
+
+                        show_colon = !show_colon;
+
+                        let res = tm.print_string(&min_sec_t, show_colon, None, 100_u16);
+                        if let Err(err) = res {
+                            error!(
+                                "[E0028a][segment display printing thread] {}",
+                                err.to_string()
+                            );
+                        }
+
+                        next_delay = 1000;
+                        min_timer_seconds_to_display_size = 5_i32;
+
+                        continue;
+                    }
+
+                    // when running time is more than 1 hour then show `00h 00n 00c`
+                    let hour_min_sec_t = format!(
+                        "{}{} {:02}{} {:02}{}",
+                        hours, "h", minutes, "n", seconds, "c"
+                    );
+                    let c = Tm1637BannerAutoScrollConfig {
+                        scroll_min_char_count: tm.display_size + 1,
+                        delay_ms: 750,
+                        min_char_count_to_be_displayed: tm.display_size,
+                    };
+
+                    let res = tm.print_string(&hour_min_sec_t, false, Some(&c), 0);
+                    if let Err(err) = res {
+                        error!(
+                            "[E0028b][segment display printing thread] {}",
+                            err.to_string()
+                        );
+                    }
+
+                    next_delay = 2000;
+                    min_timer_seconds_to_display_size = 2_i32;
+                }
+            })?;
+        }
+    }
 
     loop {
         thread::sleep(Duration::from_millis(5000));

@@ -1,15 +1,16 @@
-use crate::common::api_client::sirius_proxima::SIRIUS_PROXIMA_CLIENT;
+use crate::common::api_client::sirius_proxima::{ApiResponse, SIRIUS_PROXIMA_CLIENT};
 use crate::common::errors::api_errors::{ApiClientError, ApiResponseError};
 use crate::common::errors::wifi_errors::WifiError;
 use crate::common::models::sirius_proxima_api::Health;
 use crate::constants::default_values::DefaultValues;
-use crate::features::network_feature;
-use crate::{paniq, CommonError, EnvValues, WifiAdaptor};
-use anyhow::private::kind::TraitKind;
-use anyhow::{anyhow, Error};
+use crate::constants::segment_display_text::SegmentDisplayText;
+use crate::{CommonError, WifiAdaptor};
 use embedded_svc::wifi::{ClientConnectionStatus, ClientIpStatus, ClientStatus, Status, Wifi};
 use esp_idf_sys::c_types::c_uint;
+use log::error;
+use serde::de::DeserializeOwned;
 use std::ptr::null_mut;
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
@@ -24,11 +25,51 @@ pub struct NetworkFeature {
 pub const STACK_SIZE: usize = 32768_u32 as usize;
 
 impl NetworkFeature {
-    fn connect(&self, wifi_adaptor: &mut WifiAdaptor) -> anyhow::Result<()> {
+    fn network_response_to_segment_display_error<T>(self, response: &ApiResponse<T>) -> Option<&str>
+    where
+        T: DeserializeOwned,
+    {
+        return match &response {
+            Ok(d) => None,
+            Err(e) => {
+                let matched_api_res_err: Option<&str> = match e.downcast_ref::<ApiResponseError>() {
+                    None => None,
+                    Some(ApiResponseError::InternalServerError(_, _, _)) => {
+                        Some(SegmentDisplayText::ERR_503)
+                    }
+                    Some(
+                        ApiResponseError::SiteNotFound(_, _) | ApiResponseError::NotFound(_, _, _),
+                    ) => Some(SegmentDisplayText::ERR_404),
+                    Some(ApiResponseError::BadRequest(_, _, _)) => {
+                        Some(SegmentDisplayText::ERR_400)
+                    }
+                };
+
+                if matched_api_res_err.is_some() {
+                    return matched_api_res_err;
+                }
+
+                let matched_api_client_err: Option<&str> = match e.downcast_ref::<ApiClientError>()
+                {
+                    None => None,
+                    Some(ApiClientError::Response(_, _)) => Some(SegmentDisplayText::ERR_API),
+                    Some(ApiClientError::JsonParsing(_, _)) => Some(SegmentDisplayText::ERR_JSON),
+                };
+
+                if matched_api_client_err.is_some() {
+                    return matched_api_client_err;
+                }
+
+                None
+            }
+        };
+    }
+
+    fn connect(self, wifi_adaptor: &mut WifiAdaptor) -> anyhow::Result<()> {
         wifi_adaptor.connect()
     }
 
-    const fn check_wifi_ip_resolved(&self, status: &Status) -> bool {
+    const fn check_wifi_ip_resolved(self, status: &Status) -> bool {
         if let Status(
             ClientStatus::Started(ClientConnectionStatus::Connected(ClientIpStatus::Done(_))),
             _,
@@ -90,12 +131,18 @@ impl NetworkFeature {
         ////////
     }
 
-    fn run_ping_api_worker(&mut self) -> anyhow::Result<()> {
+    fn run_ping_api_worker(&mut self, display_tx: &Sender<Option<String>>) -> anyhow::Result<()> {
         if !self.is_network_connected {
-            log::info!(
+            log::debug!(
                 "[network feature] [run_apis] waiting for the wifi \
                      connection to get established..."
             );
+
+            let res = display_tx.send(Some(SegmentDisplayText::ERR_NO_WIFI.to_owned()));
+
+            if let Err(err) = res {
+                error!("[E0027a][run_ping_api_worker] {}", err.to_string());
+            }
 
             thread::sleep(Duration::from_millis(100));
 
@@ -103,10 +150,15 @@ impl NetworkFeature {
         }
 
         if !self.is_wifi_ip_resolved {
-            log::info!(
+            log::debug!(
                 "[network feature] [run_apis] waiting for the \
             ip to get resolved..."
             );
+
+            let res = display_tx.send(Some(SegmentDisplayText::ERR_NO_WIFI.to_owned()));
+            if let Err(err) = res {
+                error!("[E0027b][run_ping_api_worker] {}", err.to_string());
+            }
 
             thread::sleep(Duration::from_millis(100));
 
@@ -114,38 +166,12 @@ impl NetworkFeature {
         }
 
         let resp = SIRIUS_PROXIMA_CLIENT.get::<Health>("/api/health");
+        let segment_display_text = self.network_response_to_segment_display_error(&resp);
 
-        match &resp {
-            Ok(d) => {
-                println!("--- resp result {:?}", d);
-                println!("--- resp result is_health_ok {:?}", d.is_health_ok);
-            }
-            Err(e) => {
-                match e.downcast_ref::<ApiResponseError>() {
-                    None => {}
-                    Some(ApiResponseError::InternalServerError(_, _, _)) => {
-                        // unimplemented!(); //todo set the tm1673
-                    }
-                    Some(ApiResponseError::NotFound(_, _, _)) => {
-                        // unimplemented!(); //todo set the tm1673
-                    }
-                    Some(ApiResponseError::BadRequest(_, _, _)) => {
-                        //   unimplemented!(); //todo set the tm1673
-                    }
-                    Some(ApiResponseError::SiteNotFound(_, _,)) => {
-                        //   unimplemented!(); //todo set the tm1673
-                    }
-                };
-
-                match e.downcast_ref::<ApiClientError>() {
-                    None => {}
-                    Some(ApiClientError::Response(_, _)) => {
-                        // unimplemented!(); //todo set the tm1673, not reacheable
-                    }
-                    Some(ApiClientError::JsonParsing(_, _)) => {
-                        // unimplemented!(); //todo
-                    }
-                }
+        if let Some(text) = segment_display_text {
+            let res = display_tx.send(Some(text.to_owned()));
+            if let Err(err) = res {
+                error!("[E0027c][run_ping_api_worker] {}", err.to_string());
             }
         }
 
@@ -205,6 +231,7 @@ impl NetworkFeature {
     pub fn start_workers_thread(
         this: Arc<Mutex<Self>>,
         worker_condvar: Arc<Condvar>,
+        display_tx: Sender<Option<String>>,
     ) -> std::io::Result<JoinHandle<anyhow::Result<()>>> {
         thread::Builder::new()
             .stack_size(STACK_SIZE)
@@ -223,7 +250,7 @@ impl NetworkFeature {
                     if Instant::now() - last_exec_time
                         >= Duration::from_millis(DefaultValues::APIS_THREAD_DELAY)
                     {
-                        let res = this.run_ping_api_worker();
+                        let res = this.run_ping_api_worker(&display_tx);
 
                         // todo test this logic
                         // todo make sure that back to back api calls arent happening for success messages
@@ -252,10 +279,10 @@ impl NetworkFeature {
     pub fn start(
         this: &Arc<Mutex<Self>>,
         wifi_adaptor: &Arc<Mutex<WifiAdaptor>>,
+        seg_display_tx: Sender<Option<String>>,
     ) -> anyhow::Result<()> {
-        let self_arc = this;
-        let self_cloned1 = Arc::clone(self_arc);
-        let self_cloned2 = Arc::clone(self_arc);
+        let self_cloned1 = Arc::clone(this);
+        let self_cloned2 = Arc::clone(this);
         let wifi_adaptor_cloned1: Arc<Mutex<WifiAdaptor>> = Arc::clone(wifi_adaptor);
 
         let netmanager_thread_condvar = Arc::new(Condvar::new());
@@ -267,7 +294,7 @@ impl NetworkFeature {
             netmanager_thread_condvar,
         )?;
 
-        Self::start_workers_thread(self_cloned2, workers_thread_condvar)?;
+        Self::start_workers_thread(self_cloned2, workers_thread_condvar, seg_display_tx)?;
 
         Ok(())
     }

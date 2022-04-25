@@ -5,10 +5,11 @@ use crate::common::models::sirius_proxima_api::{
 };
 use crate::constants::default_values::DefaultValues;
 use crate::EnvValues;
-use attohttpc::{Response, StatusCode};
+use attohttpc::{ErrorKind, Response, StatusCode};
 use lazy_static::lazy_static;
 use log::error;
 use serde::de::DeserializeOwned;
+use thiserror::private::AsDynError;
 
 lazy_static! {
     pub static ref SIRIUS_PROXIMA_CLIENT: SiriusProximaClient = SiriusProximaClient::new();
@@ -22,6 +23,11 @@ enum ResponseType {
     OkResponse(String, StatusCode),
     ErrorResponse(String, StatusCode),
 }
+
+pub type ApiResponse<T>
+where
+    T: DeserializeOwned,
+= anyhow::Result<T>;
 
 impl SiriusProximaClient {
     fn handle_response<T: DeserializeOwned>(
@@ -55,10 +61,14 @@ impl SiriusProximaClient {
 
                 let err_str = e.to_string();
                 let err_kind = e.into_kind();
+
                 return match err_kind {
-                    attohttpc::ErrorKind::Io(ref e) => {
-                        Err(ApiResponseError::SiteNotFound("E0025".to_owned(), err_str).into())
-                    }
+                    ErrorKind::Io(io_err) => Err(ApiResponseError::SiteNotFound(
+                        "E0025".to_owned(),
+                        io_err.to_string(),
+                    )
+                    .into()),
+
                     _ => Err(ApiClientError::Response("E0020b".to_owned(), err_str).into()),
                 };
             }
@@ -72,9 +82,11 @@ impl SiriusProximaClient {
                     Err(e) => {
                         error!("[E0022a][SiriusProximaClient] {}", e.to_string());
 
-                        return Err(
-                            ApiClientError::JsonParsing("E0022b".to_owned(), e.to_string()).into(),
-                        );
+                        return Err(ApiClientError::JsonParsing(
+                            "E0022b".to_owned(),
+                            e.to_string(),
+                        )
+                        .into());
                     }
                 };
 
@@ -87,9 +99,11 @@ impl SiriusProximaClient {
                     Err(e) => {
                         error!("[E0023a][SiriusProximaClient] {}", e.to_string());
 
-                        return Err(
-                            ApiClientError::JsonParsing("E0023b".to_owned(), e.to_string()).into(),
-                        );
+                        return Err(ApiClientError::JsonParsing(
+                            "E0023b".to_owned(),
+                            e.to_string(),
+                        )
+                        .into());
                     }
                 };
 
@@ -120,7 +134,7 @@ impl SiriusProximaClient {
         };
     }
 
-    pub fn get<T>(&self, endpoint: &str) -> anyhow::Result<T>
+    pub fn get<T>(&self, endpoint: &str) -> ApiResponse<T>
     where
         T: DeserializeOwned,
     {
