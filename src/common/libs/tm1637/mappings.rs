@@ -247,7 +247,7 @@ pub enum DisplayState {
     On = 0b1000,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GpioPinValue {
     /// Low.
     Low,

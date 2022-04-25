@@ -1,2 +1,2 @@
 pub mod network_feature;
-pub mod display_feature;
+pub mod peripheral_feature;

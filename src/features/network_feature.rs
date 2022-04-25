@@ -4,7 +4,9 @@ use crate::common::errors::wifi_errors::WifiError;
 use crate::common::models::sirius_proxima_api::Health;
 use crate::constants::default_values::DefaultValues;
 use crate::constants::segment_display_text::SegmentDisplayText;
-use crate::{CommonError, WifiAdaptor};
+use crate::features::peripheral_feature::PeripheralTx;
+use crate::GpioPinValue::{High, Low};
+use crate::{CommonError, PeripheralFeature, PeripheralKind, WifiAdaptor};
 use embedded_svc::wifi::{ClientConnectionStatus, ClientIpStatus, ClientStatus, Status, Wifi};
 use esp_idf_sys::c_types::c_uint;
 use log::error;
@@ -131,18 +133,27 @@ impl NetworkFeature {
         ////////
     }
 
-    fn run_ping_api_worker(&mut self, display_tx: &Sender<Option<String>>) -> anyhow::Result<()> {
+    fn run_ping_api_worker(
+        &mut self,
+        display_tx: &Sender<Option<String>>,
+        peripheral_tx: &PeripheralTx,
+    ) -> anyhow::Result<()> {
         if !self.is_network_connected {
             log::debug!(
                 "[network feature] [run_apis] waiting for the wifi \
                      connection to get established..."
             );
 
-            let res = display_tx.send(Some(SegmentDisplayText::ERR_NO_WIFI.to_owned()));
-
-            if let Err(err) = res {
-                error!("[E0027a][run_ping_api_worker] {}", err.to_string());
+            let display_tx_res = display_tx.send(Some(SegmentDisplayText::ERR_NO_WIFI.to_owned()));
+            if let Err(err) = display_tx_res {
+                error!(
+                    "[E0027a][run_ping_api_worker display_tx_res] {}",
+                    err.to_string()
+                );
             }
+
+            // set [WifiConnectedLed] as low since the wifi is not connected
+            PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::WifiConnectedLed(Low));
 
             thread::sleep(Duration::from_millis(100));
 
@@ -155,16 +166,45 @@ impl NetworkFeature {
             ip to get resolved..."
             );
 
-            let res = display_tx.send(Some(SegmentDisplayText::ERR_NO_WIFI.to_owned()));
-            if let Err(err) = res {
-                error!("[E0027b][run_ping_api_worker] {}", err.to_string());
+            let display_tx_res = display_tx.send(Some(SegmentDisplayText::ERR_NO_WIFI.to_owned()));
+            if let Err(err) = display_tx_res {
+                error!(
+                    "[E0027b][run_ping_api_worker display_tx] {}",
+                    err.to_string()
+                );
             }
+
+            // set [WifiConnectedLed] as low since the wifi is not connected
+            PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::WifiConnectedLed(Low));
 
             thread::sleep(Duration::from_millis(100));
 
             return Err(WifiError::UnresolvedIp("E0018".to_owned()).into());
         }
 
+        // turn on [WifiConnectedLed] since the network connection has been established now
+        PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::WifiConnectedLed(High));
+
+        // blink the [ProximaApiRequestLed] to indicate a network api request
+        for i in 0_i32..5_i32 {
+            if i % 2 == 0_i32 {
+                PeripheralFeature::set_peripheral(
+                    peripheral_tx,
+                    PeripheralKind::ProximaApiRequestLed(High),
+                );
+            } else {
+                PeripheralFeature::set_peripheral(
+                    peripheral_tx,
+                    PeripheralKind::ProximaApiRequestLed(Low),
+                );
+            }
+
+            thread::sleep(Duration::from_millis(25));
+        }
+        // turn off [ProximaApiRequestLed]
+        PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::ProximaApiRequestLed(Low));
+
+        // network request starts here
         let resp = SIRIUS_PROXIMA_CLIENT.get::<Health>("/api/health");
         let segment_display_text = self.network_response_to_segment_display_error(&resp);
 
@@ -232,6 +272,7 @@ impl NetworkFeature {
         this: Arc<Mutex<Self>>,
         worker_condvar: Arc<Condvar>,
         display_tx: Sender<Option<String>>,
+        peripheral_tx: PeripheralTx,
     ) -> std::io::Result<JoinHandle<anyhow::Result<()>>> {
         thread::Builder::new()
             .stack_size(STACK_SIZE)
@@ -250,7 +291,7 @@ impl NetworkFeature {
                     if Instant::now() - last_exec_time
                         >= Duration::from_millis(DefaultValues::APIS_THREAD_DELAY)
                     {
-                        let res = this.run_ping_api_worker(&display_tx);
+                        let res = this.run_ping_api_worker(&display_tx, &peripheral_tx);
 
                         // todo test this logic
                         // todo make sure that back to back api calls arent happening for success messages
@@ -280,6 +321,7 @@ impl NetworkFeature {
         this: &Arc<Mutex<Self>>,
         wifi_adaptor: &Arc<Mutex<WifiAdaptor>>,
         seg_display_tx: Sender<Option<String>>,
+        peripheral_tx: PeripheralTx,
     ) -> anyhow::Result<()> {
         let self_cloned1 = Arc::clone(this);
         let self_cloned2 = Arc::clone(this);
@@ -294,7 +336,12 @@ impl NetworkFeature {
             netmanager_thread_condvar,
         )?;
 
-        Self::start_workers_thread(self_cloned2, workers_thread_condvar, seg_display_tx)?;
+        Self::start_workers_thread(
+            self_cloned2,
+            workers_thread_condvar,
+            seg_display_tx,
+            peripheral_tx,
+        )?;
 
         Ok(())
     }
