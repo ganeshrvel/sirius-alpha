@@ -8,6 +8,14 @@
 # Introduction
 Sirius Alpha is an IOT module which runs on the ESP32 chips, they are safe and super fast. This module is in it's early stages of development.
 
+Rename .sample.env as .env and edit the values
+
+- TLS demo https://github.com/killyourphone/tlsdemo
+
+- You will need to source the setup_envs.sh file before things will work! That sets up the correct compiler overrides for ring's cc based build script.
+```shell
+source ./scripts/setup_envs.sh
+```
 
 ### Contribute
 If you are interested in fixing issues and contributing directly to the code base.
