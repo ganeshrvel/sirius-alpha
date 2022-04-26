@@ -34,6 +34,8 @@ cd ./scripts
 ./build.sh
 ```
 
+- `.env` file will get automatically generated after running the `./build.sh` file
+
 ### Contribute
 If you are interested in fixing issues and contributing directly to the code base.
 
