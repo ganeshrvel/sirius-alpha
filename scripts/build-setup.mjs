@@ -103,7 +103,7 @@ const flashingEnv = flashingEnvObj.answer;
 await fsExtra.remove ( DOT_ENV_FILE_PATH )
 await fsExtra.ensureFile ( DOT_ENV_FILE_PATH )
 
-fs.appendFileSync ( DOT_ENV_FILE_PATH, `## This is generated file${os.EOL}## DO NOT commit this file to GIT as it holds your secret keys${os.EOL}` );
+fs.appendFileSync ( DOT_ENV_FILE_PATH, `## This is a generated file${os.EOL}## DO NOT commit this file to GIT as it holds your secret keys${os.EOL}` );
 for ( const line of flashingEnvStrings ) {
 	fs.appendFileSync ( DOT_ENV_FILE_PATH, `${line}${os.EOL}` );
 }
