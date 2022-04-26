@@ -1,0 +1,23 @@
+{
+  "name": "sirius-alpha-rust-tools",
+  "productName": "sirius-alpha-rust-tools",
+  "version": "0.0.1",
+  "description": "sirius-alpha-rust-tools",
+  "scripts": {},
+  "browserslist": [],
+  "main": "build-setup.mjs",
+  "devDependencies": {
+    "fs-extra": "^10.1.0",
+    "inquirer": "^8.2.2",
+    "js-yaml": "^4.1.0",
+    "path": "^0.12.7",
+    "pkg-dir": "^6.0.1",
+    "yarn": "^1.22.18",
+    "zx": "^6.1.0"
+  },
+  "devEngines": {
+    "node": ">=16.x",
+    "npm": ">=6.x",
+    "yarn": ">=0.21.3"
+  }
+}

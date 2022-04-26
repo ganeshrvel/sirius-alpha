@@ -34,7 +34,6 @@ serde_json = "1.0.79"
 serde-value = "0.7.0"
 
 lazy_static = "1.4.0"
-
 dotenv_codegen = "0.15.0"
 
 [patch.crates-io]

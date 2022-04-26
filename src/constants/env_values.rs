@@ -17,4 +17,12 @@ impl EnvValues<'static> {
     pub const API_SECRET_TOKEN: &'static str = dotenv!("API_SECRET_TOKEN");
 
     pub const API_BASE_URL: &'static str = dotenv!("API_BASE_URL");
+
+    pub const DEVICE_TYPE: &'static str = dotenv!("DEVICE_TYPE");
+
+    pub const DEVICE_NAME: &'static str = dotenv!("DEVICE_NAME");
+
+    pub const DEVICE_ID: &'static str = dotenv!("DEVICE_ID");
+
+    pub const DEVICE_LOCATION: &'static str = dotenv!("DEVICE_LOCATION");
 }

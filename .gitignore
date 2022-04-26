@@ -11,7 +11,7 @@ idea/
 
 
 tarpaulin-report.html
-.env
+*.env
 cobertura.xml
 prod/
 node_modules/
@@ -33,3 +33,5 @@ Rocket.toml
 ./Rocket.toml
 app-settings.yaml
 iot-settings.yaml
+node_modules/**/*
+env.yaml

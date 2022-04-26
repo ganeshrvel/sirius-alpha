@@ -17,6 +17,23 @@ Rename .sample.env as .env and edit the values
 source ./scripts/setup_envs.sh
 ```
 
+
+```shell
+#install node 16 or above
+npm -g i nvm
+
+#use node 16 or above
+nvm use 16
+
+#install zx globally
+npm -g i zx
+```
+
+```shell
+cd ./scripts
+./build.sh
+```
+
 ### Contribute
 If you are interested in fixing issues and contributing directly to the code base.
 
