@@ -144,6 +144,16 @@ impl SiriusProximaClient {
         Ok(response_handled)
     }
 
+    // pub fn put<T>(&self, endpoint: &str) -> ApiResponse<T>
+    // where
+    //     T: DeserializeOwned,
+    // {
+    //     let response = self.base_api_client.get(endpoint);
+    //     let response_handled: T = self.handle_response::<T>(response)?;
+    //
+    //     Ok(response_handled)
+    // }
+
     pub fn new() -> Self {
         let ac = ApiClient {
             base_url: EnvValues::API_BASE_URL.to_owned(),

@@ -34,4 +34,4 @@ Rocket.toml
 app-settings.yaml
 iot-settings.yaml
 node_modules/**/*
-env.yaml
+get-platformio.py

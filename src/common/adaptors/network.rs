@@ -2,10 +2,13 @@ use crate::common::errors::wifi_errors::WifiError;
 use crate::constants::default_values::DefaultValues;
 use crate::constants::env_values::EnvValues;
 use embedded_svc::wifi::{ClientConfiguration, Configuration, Wifi};
-use esp_idf_svc::netif::EspNetifStack;
+use esp_idf_svc::netif::{EspNetif, EspNetifStack, InterfaceConfiguration, InterfaceStack};
 use esp_idf_svc::nvs::EspDefaultNvs;
 use esp_idf_svc::sysloop::EspSysLoopStack;
 use esp_idf_svc::wifi::EspWifi;
+use esp_idf_sys::c_types::c_char;
+use log::error;
+use std::ffi::CString;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
@@ -78,14 +81,42 @@ impl WifiAdaptor {
 
     pub fn new() -> anyhow::Result<Self> {
         let netif_stack = Arc::new(EspNetifStack::new()?);
+        // let netif_stack_clone = Arc::<esp_idf_svc::netif::EspNetifStack>::clone(&netif_stack);
+        //  let interface_stack_config = InterfaceStack::Sta.get_default_configuration();
+
+        // let esp_netif = EspNetif::new(netif_stack_clone, &interface_stack_config)?;
+
+        // esp_netif.set_hostname(EnvValues::DEVICE_ID)?;
+
         let sys_loop_stack = Arc::new(EspSysLoopStack::new()?);
         let default_nvs = Arc::new(EspDefaultNvs::new()?);
 
         let esp_wifi = EspWifi::new(netif_stack, sys_loop_stack, default_nvs)?;
 
+        // netif_stack.
+
+        // pub struct esp_netif_config {
+        //     pub base: *const esp_netif_inherent_config_t,
+        //     pub driver: *const esp_netif_driver_ifconfig_t,
+        //     pub stack: *const esp_netif_netstack_config_t,
+        // }
+
         // SAFETY: ESP IDF related sys call
         unsafe {
             esp_idf_sys::esp_wifi_set_ps(esp_idf_sys::wifi_ps_type_t_WIFI_PS_NONE);
+
+            // let c = std::ffi::CString::new(EnvValues::DEVICE_ID.to_owned())?;
+            // esp_idf_sys::tcpip_adapter_set_hostname(
+            //     esp_idf_sys::tcpip_adapter_if_t_TCPIP_ADAPTER_IF_STA,
+            //     c.as_ptr(),
+            // );
+
+            //let esp_netif_t = esp_idf_sys::esp_netif_new();
+            //esp_idf_sys::esp_netif_set_hostname(esp_netif_t, c.as_ptr());
+            //  esp_idf_sys::sethostname(
+            //     c.as_ptr(),
+            //     esp_idf_sys::tcpip_adapter_if_t_TCPIP_ADAPTER_IF_STA,
+            // );
         }
 
         log::debug!("[network] wifi adaptor created");

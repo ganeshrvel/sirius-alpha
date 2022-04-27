@@ -8,6 +8,21 @@
 # Introduction
 Sirius Alpha is an IOT module which runs on the ESP32 chips, they are safe and super fast. This module is in it's early stages of development.
 
+
+### Device setup
+```shell
+curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py -o get-platformio.py
+python3 get-platformio.py
+
+cargo install cargo-pio --git https://github.com/ivmarkov/cargo-pio
+cargo pio espidf menuconfig
+```
+
+- Change setting here: `Component Config (second last option) -> LWIP (scroll down) -> Local netif hostname (first option)`
+- Enter to change the text
+- Press `s` to save
+- 
+
 Rename .sample.env.yaml as .env.yaml and edit the values
 
 - TLS demo https://github.com/killyourphone/tlsdemo

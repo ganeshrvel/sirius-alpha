@@ -33,6 +33,9 @@ serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0.79"
 serde-value = "0.7.0"
 
+strum = "0.24.0"
+strum_macros = "0.24.0"
+
 lazy_static = "1.4.0"
 dotenv_codegen = "0.15.0"
 

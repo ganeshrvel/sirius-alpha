@@ -1,7 +1,7 @@
 use crate::common::api_client::sirius_proxima::{ApiResponse, SIRIUS_PROXIMA_CLIENT};
 use crate::common::errors::api_errors::{ApiClientError, ApiResponseError};
 use crate::common::errors::wifi_errors::WifiError;
-use crate::common::models::sirius_proxima_api::Health;
+use crate::common::models::sirius_proxima_api::{Device, Health};
 use crate::constants::default_values::DefaultValues;
 use crate::constants::segment_display_text::SegmentDisplayText;
 use crate::features::peripheral_feature::PeripheralTx;
@@ -205,6 +205,7 @@ impl NetworkFeature {
         PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::ProximaApiRequestLed(Low));
 
         // network request starts here
+        // let resp = SIRIUS_PROXIMA_CLIENT.get::<Device>("/api/v1/sirius_alpha/ping");
         let resp = SIRIUS_PROXIMA_CLIENT.get::<Health>("/api/health");
         let segment_display_text = self.network_response_to_segment_display_error(&resp);
 

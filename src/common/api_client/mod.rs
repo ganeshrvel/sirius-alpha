@@ -1,6 +1,6 @@
 use crate::constants::default_values::DefaultValues;
 use crate::EnvValues;
-use attohttpc::{Method, RequestBuilder, Response};
+use attohttpc::{body, Method, RequestBuilder, Response};
 use std::time::Duration;
 
 pub mod sirius_proxima;
@@ -30,4 +30,10 @@ impl ApiClient {
         let req = self.req_builder(Method::GET, endpoint);
         req.send()
     }
+
+    // fn put(&self, endpoint: &str,  body: body::Json<>) -> attohttpc::Result<Response> {
+    //     let req = self.req_builder(Method::PUT, endpoint);
+    //     req.body();
+    //     req.send()
+    // }
 }
