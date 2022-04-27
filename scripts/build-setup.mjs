@@ -54,7 +54,7 @@ async function getBuildEnvFromPrompt ( secretYamlFileDoc ) {
 	}
 }
 
-async function runCmd ( command, args ) {
+async function runSpawn ( command, args ) {
 	return new Promise ( ( resolve, reject ) => {
 		const buildSpawn = spawn (
 			command,
@@ -103,20 +103,22 @@ const flashingEnv = flashingEnvObj.answer;
 await fsExtra.remove ( DOT_ENV_FILE_PATH )
 await fsExtra.ensureFile ( DOT_ENV_FILE_PATH )
 
-fs.appendFileSync ( DOT_ENV_FILE_PATH, `## This is a generated file${os.EOL}## DO NOT commit this file to GIT as it holds your secret keys${os.EOL}` );
+const dotFileId = fs.openSync ( DOT_ENV_FILE_PATH, 'a', 640 );
+fs.writeSync ( dotFileId, `## This is a generated file${os.EOL}## DO NOT commit this file to GIT as it holds your secret keys${os.EOL}`, null, 'utf8' );
 for ( const line of flashingEnvStrings ) {
-	fs.appendFileSync ( DOT_ENV_FILE_PATH, `${line}${os.EOL}` );
+	fs.writeSync ( dotFileId, `${line}${os.EOL}`, null, 'utf8' );
 }
-
 for ( const line of flashingDeviceTypeStrings ) {
-	fs.appendFileSync ( DOT_ENV_FILE_PATH, `${line}${os.EOL}` );
+	fs.writeSync ( dotFileId, `${line}${os.EOL}`, null, 'utf8' );
 }
+await fs.closeSync ( dotFileId );
+
 
 if ( flashingEnv === 'release' ) {
-	await runCmd ( "cargo", ["build", "--release"] );
+	await runSpawn ( "cargo", ["build", "--release"] );
 }
 else {
-	await runCmd ( "cargo", ["build"] );
+	await runSpawn ( "cargo", ["build"] );
 }
 
 console.info ( `flashing the ${flashingEnvObj.answer} build..` );
@@ -124,6 +126,6 @@ console.info ( "hold boot button and release it when the flashing starts..." );
 
 await $`sleep 2`
 
-await runCmd ( "espflash",
+await runSpawn ( "espflash",
 	["/dev/cu.usbserial-0001", `../target/xtensa-esp32-espidf/${flashingEnvObj.answer}/sirius-alpha-rust`] );
 

@@ -8,7 +8,7 @@
 # Introduction
 Sirius Alpha is an IOT module which runs on the ESP32 chips, they are safe and super fast. This module is in it's early stages of development.
 
-Rename .sample.env as .env and edit the values
+Rename .sample.env.yaml as .env.yaml and edit the values
 
 - TLS demo https://github.com/killyourphone/tlsdemo
 
