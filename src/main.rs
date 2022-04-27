@@ -1,4 +1,4 @@
-#![deny(clippy::all)]
+#![deny(clippy::all, unused_must_use)]
 #![warn(
     clippy::all,
     clippy::restriction,
