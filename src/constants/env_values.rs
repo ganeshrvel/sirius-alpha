@@ -26,5 +26,5 @@ impl EnvValues<'static> {
 
     pub const DEVICE_LOCATION: &'static str = dotenv!("DEVICE_LOCATION");
 
-    pub  const APP_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+    pub const APP_VERSION: &'static str = env!("CARGO_PKG_VERSION");
 }

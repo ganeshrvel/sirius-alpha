@@ -5,11 +5,15 @@ use crate::common::models::sirius_proxima_api::{
 };
 use crate::constants::default_values::DefaultValues;
 use crate::EnvValues;
-use attohttpc::{ErrorKind, Response, StatusCode};
+use attohttpc::header::{HeaderValue, IntoHeaderName};
+use attohttpc::{Error, ErrorKind, Response, StatusCode};
 use lazy_static::lazy_static;
 use log::error;
 use serde::de::DeserializeOwned;
-use thiserror::private::AsDynError;
+use serde::Deserialize;
+use std::collections::HashMap;
+use std::convert::TryInto;
+use std::fmt::Debug;
 
 lazy_static! {
     pub static ref SIRIUS_PROXIMA_CLIENT: SiriusProximaClient = SiriusProximaClient::new();
@@ -24,16 +28,13 @@ enum ResponseType {
     ErrorResponse(String, StatusCode),
 }
 
-pub type ApiResponse<T>
-where
-    T: DeserializeOwned,
-= anyhow::Result<T>;
+pub type ApiResponse<De: DeserializeOwned> = anyhow::Result<De>;
 
 impl SiriusProximaClient {
-    fn handle_response<T: DeserializeOwned>(
+    fn handle_response<De: DeserializeOwned>(
         &self,
         response: attohttpc::Result<Response>,
-    ) -> anyhow::Result<T> {
+    ) -> anyhow::Result<De> {
         let resp_ok = match response {
             Ok(server_response) => {
                 let is_success = server_response.is_success();
@@ -76,7 +77,7 @@ impl SiriusProximaClient {
 
         return match resp_ok {
             ResponseType::OkResponse(d, _) => {
-                let resp_json = serde_json::from_str::<SiriusProximaSuccessResponse<T>>(&*d);
+                let resp_json = serde_json::from_str::<SiriusProximaSuccessResponse<De>>(&*d);
                 let resp_json_ok = match resp_json {
                     Ok(s) => s,
                     Err(e) => {
@@ -134,25 +135,64 @@ impl SiriusProximaClient {
         };
     }
 
-    pub fn get<T>(&self, endpoint: &str) -> ApiResponse<T>
+    pub fn get<De, H, V>(
+        &self,
+        endpoint: &str,
+        headers: Option<HashMap<H, V>>,
+        query_params: Option<HashMap<&str, &str>>,
+    ) -> ApiResponse<De>
     where
-        T: DeserializeOwned,
+        De: DeserializeOwned,
+        H: IntoHeaderName + Debug,
+        V: TryInto<HeaderValue> + Debug,
+        Error: From<V::Error>,
     {
-        let response = self.base_api_client.get(endpoint);
-        let response_handled: T = self.handle_response::<T>(response)?;
+        let response = self.base_api_client.get(endpoint, headers, query_params);
+        let response_handled: De = self.handle_response::<De>(response)?;
 
         Ok(response_handled)
     }
 
-    // pub fn put<T>(&self, endpoint: &str) -> ApiResponse<T>
-    // where
-    //     T: DeserializeOwned,
-    // {
-    //     let response = self.base_api_client.get(endpoint);
-    //     let response_handled: T = self.handle_response::<T>(response)?;
-    //
-    //     Ok(response_handled)
-    // }
+    /// Put Method:
+    ///
+    ///
+    /// Headers:
+    /// # Example
+    /// ```
+    /// let mut headers = HashMap::new();
+    ///     headers.insert(
+    ///         "header-key","header-value"
+    ///     );
+    /// ```
+    ///
+    /// Query String params:
+    /// # Example
+    /// ```
+    ///  let mut query_params = HashMap::new();
+    //   query_params.insert("param-1", "value-1");
+    /// ```
+    pub fn put<De, Se, H, V>(
+        &self,
+        endpoint: &str,
+        body: &Se,
+        headers: Option<HashMap<H, V>>,
+        query_params: Option<HashMap<&str, &str>>,
+    ) -> ApiResponse<De>
+    where
+        De: DeserializeOwned,
+        Se: serde::Serialize,
+        H: IntoHeaderName + Debug,
+        V: TryInto<HeaderValue> + Debug,
+
+        Error: From<V::Error>,
+    {
+        let response = self
+            .base_api_client
+            .put::<Se, H, V>(endpoint, body, headers, query_params);
+        let response_handled: De = self.handle_response::<De>(response)?;
+
+        Ok(response_handled)
+    }
 
     pub fn new() -> Self {
         let ac = ApiClient {
@@ -165,4 +205,10 @@ impl SiriusProximaClient {
             base_api_client: ac,
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PingResponse {
+    pub short_period_buzzer_beep_duration_ms: usize,
+    pub is_continuous_period_buzzer_beep_active: bool,
 }

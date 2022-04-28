@@ -20,9 +20,7 @@ embedded-svc = "0.17.4"
 esp-idf-sys = { version = "0.30.6", features = ["binstart"] }
 embedded-hal = "0.2.7"
 
-url = "2.2.2"
-
-attohttpc = { git = "https://github.com/killyourphone/attohttpc", branch = "esp32", default-features = false, features = ["compress"] }
+attohttpc = { git = "https://github.com/killyourphone/attohttpc", branch = "esp32", default-features = false, features = ["compress", "json"] }
 
 fern = { version = "0.6.0", features = ["colored"] }
 log = "0.4.14"
@@ -35,6 +33,7 @@ serde-value = "0.7.0"
 
 strum = "0.24.0"
 strum_macros = "0.24.0"
+either = "1.6.1"
 
 lazy_static = "1.4.0"
 dotenv_codegen = "0.15.0"

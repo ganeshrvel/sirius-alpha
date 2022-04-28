@@ -30,6 +30,8 @@ mod constants;
 mod features;
 mod helpers;
 mod macros;
+mod utils;
+mod libs;
 
 #[macro_use]
 extern crate dotenv_codegen;
@@ -37,8 +39,8 @@ extern crate dotenv_codegen;
 use crate::common::adaptors::network::WifiAdaptor;
 use crate::common::errors::common_errors::CommonError;
 use crate::common::errors::device_errors::DeviceError;
-use crate::common::libs::tm1637::mappings::{Brightness, DisplayState, GpioPinValue};
-use crate::common::libs::tm1637::{Tm1637, Tm1637BannerAutoScrollConfig};
+use crate::libs::tm1637::mappings::{Brightness, DisplayState, GpioPinValue};
+use crate::libs::tm1637::{Tm1637, Tm1637BannerAutoScrollConfig};
 use crate::constants::env_values::EnvValues;
 
 use embedded_svc::sys_time::SystemTime;

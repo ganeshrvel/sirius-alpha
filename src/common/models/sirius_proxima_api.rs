@@ -25,7 +25,22 @@ pub struct SiriusProximaErrorResponse {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SiriusProximaPing {
+    pub device_type: DeviceType,
+    pub device: Device,
+}
+
+impl SiriusProximaPing {
+    pub fn new() -> anyhow::Result<Self> {
+        Ok(Self {
+            device_type: DeviceType::from_str(EnvValues::DEVICE_TYPE)?,
+            device: Device::new()?,
+        })
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Device {
     pub device_type: DeviceType,
     pub details: DeviceDetails,
@@ -40,7 +55,7 @@ impl Device {
     }
 }
 
-#[derive(Debug, Deserialize, Clone, EnumString)]
+#[derive(Debug, Serialize, Deserialize, Clone, EnumString)]
 pub enum DeviceType {
     #[strum(serialize = "roof_water_heater")]
     #[serde(rename = "roof_water_heater")]
@@ -55,7 +70,7 @@ pub enum DeviceType {
     GroundWellMotor,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeviceDetails {
     pub device_name: String,
     pub model: Model,

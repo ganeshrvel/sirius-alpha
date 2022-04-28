@@ -10,8 +10,8 @@ pub mod mappings;
 
 extern crate embedded_hal as hal;
 
-use crate::common::libs::tm1637::errors::TmError;
-use crate::common::libs::tm1637::mappings::{
+use crate::libs::tm1637::errors::TmError;
+use crate::libs::tm1637::mappings::{
     Brightness, DisplayState, GpioPinValue, LowerCharBits, NumberCharBits, SpecialCharBits,
     UpperCharBits, ISA,
 };

@@ -1,16 +1,19 @@
-use crate::common::api_client::sirius_proxima::{ApiResponse, SIRIUS_PROXIMA_CLIENT};
+use crate::common::api_client::sirius_proxima::{ApiResponse, PingResponse, SIRIUS_PROXIMA_CLIENT};
 use crate::common::errors::api_errors::{ApiClientError, ApiResponseError};
 use crate::common::errors::wifi_errors::WifiError;
-use crate::common::models::sirius_proxima_api::{Device, Health};
+use crate::common::models::sirius_proxima_api::SiriusProximaPing;
 use crate::constants::default_values::DefaultValues;
+use crate::constants::headers::{HeaderKeys, HeaderValues};
 use crate::constants::segment_display_text::SegmentDisplayText;
 use crate::features::peripheral_feature::PeripheralTx;
 use crate::GpioPinValue::{High, Low};
-use crate::{CommonError, PeripheralFeature, PeripheralKind, WifiAdaptor};
+use crate::{CommonError, EnvValues, PeripheralFeature, PeripheralKind, WifiAdaptor};
+use either::Either;
 use embedded_svc::wifi::{ClientConnectionStatus, ClientIpStatus, ClientStatus, Status, Wifi};
 use esp_idf_sys::c_types::c_uint;
 use log::error;
 use serde::de::DeserializeOwned;
+use std::collections::HashMap;
 use std::ptr::null_mut;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex};
@@ -27,12 +30,12 @@ pub struct NetworkFeature {
 pub const STACK_SIZE: usize = 32768_u32 as usize;
 
 impl NetworkFeature {
-    fn network_response_to_segment_display_error<T>(self, response: &ApiResponse<T>) -> Option<&str>
+    fn process_network_response<T>(self, response: &ApiResponse<T>) -> Either<&T, Option<&str>>
     where
         T: DeserializeOwned,
     {
         return match &response {
-            Ok(d) => None,
+            Ok(d) => Either::Left(d),
             Err(e) => {
                 let matched_api_res_err: Option<&str> = match e.downcast_ref::<ApiResponseError>() {
                     None => None,
@@ -48,7 +51,7 @@ impl NetworkFeature {
                 };
 
                 if matched_api_res_err.is_some() {
-                    return matched_api_res_err;
+                    return Either::Right(matched_api_res_err);
                 }
 
                 let matched_api_client_err: Option<&str> = match e.downcast_ref::<ApiClientError>()
@@ -59,10 +62,10 @@ impl NetworkFeature {
                 };
 
                 if matched_api_client_err.is_some() {
-                    return matched_api_client_err;
+                    return Either::Right(matched_api_client_err);
                 }
 
-                None
+                Either::Right(None)
             }
         };
     }
@@ -205,14 +208,34 @@ impl NetworkFeature {
         PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::ProximaApiRequestLed(Low));
 
         // network request starts here
-        // let resp = SIRIUS_PROXIMA_CLIENT.get::<Device>("/api/v1/sirius_alpha/ping");
-        let resp = SIRIUS_PROXIMA_CLIENT.get::<Health>("/api/health");
-        let segment_display_text = self.network_response_to_segment_display_error(&resp);
+        let json_data = SiriusProximaPing::new()?;
+        let mut headers = HashMap::new();
+        headers.insert(
+            HeaderKeys::DEVICE_ID,
+            json_data.device.details.device_id.as_str(),
+        );
+        headers.insert(EnvValues::API_TOKEN_KEY, EnvValues::API_SECRET_TOKEN);
+        headers.insert(HeaderKeys::CONTENT_TYPE, HeaderValues::APPLICATION_JSON);
 
-        if let Some(text) = segment_display_text {
-            let res = display_tx.send(Some(text.to_owned()));
-            if let Err(err) = res {
-                error!("[E0027c][run_ping_api_worker] {}", err.to_string());
+        let resp = SIRIUS_PROXIMA_CLIENT.put::<PingResponse, _, _, _>(
+            "/api/v1/sirius_alpha/ping",
+            &json_data,
+            Some(headers),
+            None,
+        );
+
+        let processed_network_response = self.process_network_response(&resp);
+        match processed_network_response {
+            Either::Left(ping_response) => {
+                println!("ping_response {:?}", ping_response);
+            }
+            Either::Right(segment_display_text) => {
+                if let Some(text) = segment_display_text {
+                    let res = display_tx.send(Some(text.to_owned()));
+                    if let Err(err) = res {
+                        error!("[E0027c][run_ping_api_worker] {}", err.to_string());
+                    }
+                }
             }
         }
 
