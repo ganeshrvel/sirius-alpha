@@ -5,9 +5,9 @@ use crate::common::models::sirius_proxima_api::SiriusProximaPing;
 use crate::constants::default_values::DefaultValues;
 use crate::constants::headers::{HeaderKeys, HeaderValues};
 use crate::constants::segment_display_text::SegmentDisplayText;
-use crate::features::peripheral_feature::PeripheralTx;
+use crate::features::peripheral::{PeripheralFeature, PeripheralKind, PeripheralTx};
 use crate::GpioPinValue::{High, Low};
-use crate::{CommonError, EnvValues, PeripheralFeature, PeripheralKind, WifiAdaptor};
+use crate::{CommonError, EnvValues, WifiAdaptor};
 use either::Either;
 use embedded_svc::wifi::{ClientConnectionStatus, ClientIpStatus, ClientStatus, Status, Wifi};
 use esp_idf_sys::c_types::c_uint;
@@ -20,6 +20,9 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
+use crate::features::network::apis::network_apis;
+
+pub mod apis;
 
 #[derive(Clone, Copy)]
 pub struct NetworkFeature {
@@ -207,24 +210,8 @@ impl NetworkFeature {
         // turn off [ProximaApiRequestLed]
         PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::ProximaApiRequestLed(Low));
 
-        // network request starts here
-        let json_data = SiriusProximaPing::new()?;
-        let mut headers = HashMap::new();
-        headers.insert(
-            HeaderKeys::DEVICE_ID,
-            json_data.device.details.device_id.as_str(),
-        );
-        headers.insert(EnvValues::API_TOKEN_KEY, EnvValues::API_SECRET_TOKEN);
-        headers.insert(HeaderKeys::CONTENT_TYPE, HeaderValues::APPLICATION_JSON);
-
-        let resp = SIRIUS_PROXIMA_CLIENT.put::<PingResponse, _, _, _>(
-            "/api/v1/sirius_alpha/ping",
-            &json_data,
-            Some(headers),
-            None,
-        );
-
-        let processed_network_response = self.process_network_response(&resp);
+        let ping_resp =  network_apis.ping();
+        let processed_network_response = self.process_network_response(&ping_resp);
         match processed_network_response {
             Either::Left(ping_response) => {
                 println!("ping_response {:?}", ping_response);

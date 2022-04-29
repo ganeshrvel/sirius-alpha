@@ -29,9 +29,9 @@ mod common;
 mod constants;
 mod features;
 mod helpers;
+mod libs;
 mod macros;
 mod utils;
-mod libs;
 
 #[macro_use]
 extern crate dotenv_codegen;
@@ -39,9 +39,9 @@ extern crate dotenv_codegen;
 use crate::common::adaptors::network::WifiAdaptor;
 use crate::common::errors::common_errors::CommonError;
 use crate::common::errors::device_errors::DeviceError;
+use crate::constants::env_values::EnvValues;
 use crate::libs::tm1637::mappings::{Brightness, DisplayState, GpioPinValue};
 use crate::libs::tm1637::{Tm1637, Tm1637BannerAutoScrollConfig};
-use crate::constants::env_values::EnvValues;
 
 use embedded_svc::sys_time::SystemTime;
 use esp_idf_sys::link_patches;
@@ -52,10 +52,8 @@ use std::thread;
 use std::time::Duration;
 
 use crate::constants::strings::Strings;
-use crate::features::network_feature::NetworkFeature;
-use crate::features::peripheral_feature::{
-    PeripheralFeature, PeripheralFeatureStartPins, PeripheralKind, PeripheralRx, PeripheralTx,
-};
+use crate::features::network::NetworkFeature;
+use crate::features::peripheral::{PeripheralFeature, PeripheralFeatureStartPins, PeripheralKind, PeripheralRx, PeripheralTx};
 use crate::helpers::logs::fern_log::setup_logging;
 use crate::GpioPinValue::High;
 
