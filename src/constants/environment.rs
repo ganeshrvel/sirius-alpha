@@ -28,6 +28,7 @@ impl Environment {
 pub struct EnvConfig {
     pub show_network_requests: bool,
     pub show_network_response: bool,
+    pub show_sirius_proxima_network_response: bool,
 }
 
 impl EnvConfig {
@@ -36,12 +37,14 @@ impl EnvConfig {
             return Self {
                 show_network_requests: true,
                 show_network_response: true,
+                show_sirius_proxima_network_response: true,
             };
         }
 
         Self {
             show_network_requests: false,
             show_network_response: false,
+            show_sirius_proxima_network_response: false,
         }
     }
 }

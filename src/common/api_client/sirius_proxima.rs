@@ -4,11 +4,12 @@ use crate::common::models::sirius_proxima_api::{
     SiriusProximaErrorResponse, SiriusProximaSuccessResponse,
 };
 use crate::constants::default_values::DefaultValues;
+use crate::constants::environment::APP_ENV;
 use crate::EnvValues;
 use attohttpc::header::{HeaderValue, IntoHeaderName};
 use attohttpc::{Error, ErrorKind, Response, StatusCode};
 use lazy_static::lazy_static;
-use log::error;
+use log::{debug, error, info, warn};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -39,9 +40,26 @@ impl SiriusProximaClient {
             Ok(server_response) => {
                 let is_success = server_response.is_success();
                 let status_code = server_response.status();
+                let headers = server_response.headers().clone();
+
                 let resp_text = server_response.text();
                 let resp_text_ok = match resp_text {
-                    Ok(s) => s,
+                    Ok(s) => {
+                        if APP_ENV.config.show_sirius_proxima_network_response {
+                            debug!("\n\n");
+                            debug!("=======================================");
+                            warn!("[SiriusProximaClient] Response handler");
+
+                            info!("Status: {}", status_code);
+                            info!("Is success: {}", is_success);
+                            info!("Headers: {:?}", headers);
+                            info!("Body: {}", s);
+
+                            debug!("=======================================\n\n");
+                        }
+
+                        s
+                    }
                     Err(e) => {
                         error!("[E0021a][SiriusProximaClient] {}", e.to_string());
 
@@ -197,7 +215,7 @@ impl SiriusProximaClient {
     pub fn new() -> Self {
         let ac = ApiClient {
             base_url: EnvValues::API_BASE_URL.to_owned(),
-            connect_timeout_ms: DefaultValues::API_TIMEOUT,
+            connect_timeout_ms: DefaultValues::API_TIMEOUT_MS,
             enable_compression: true,
         };
 

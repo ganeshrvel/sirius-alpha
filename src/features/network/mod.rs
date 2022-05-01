@@ -1,38 +1,37 @@
-use crate::common::api_client::sirius_proxima::{ApiResponse, PingResponse, SIRIUS_PROXIMA_CLIENT};
+use crate::common::api_client::sirius_proxima::{ApiResponse, PingResponse};
 use crate::common::errors::api_errors::{ApiClientError, ApiResponseError};
 use crate::common::errors::wifi_errors::WifiError;
-use crate::common::models::sirius_proxima_api::SiriusProximaPing;
 use crate::constants::default_values::DefaultValues;
-use crate::constants::headers::{HeaderKeys, HeaderValues};
 use crate::constants::segment_display_text::SegmentDisplayText;
-use crate::features::peripheral::{PeripheralFeature, PeripheralKind, PeripheralTx};
+use crate::features::network::apis::network_apis;
+use crate::features::peripheral::{Peripheral, PeripheralKind, PeripheralTx};
+use crate::helpers::atomic_esp_system_time::{AtomicSystemTime, Diff};
 use crate::GpioPinValue::{High, Low};
-use crate::{CommonError, EnvValues, WifiAdaptor};
+use crate::{CommonError, WifiAdaptor};
 use either::Either;
 use embedded_svc::wifi::{ClientConnectionStatus, ClientIpStatus, ClientStatus, Status, Wifi};
 use esp_idf_sys::c_types::c_uint;
 use log::error;
 use serde::de::DeserializeOwned;
-use std::collections::HashMap;
 use std::ptr::null_mut;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
-use crate::features::network::apis::network_apis;
 
 pub mod apis;
 
 #[derive(Clone, Copy)]
-pub struct NetworkFeature {
+pub struct Network {
     is_network_connected: bool,
     is_wifi_ip_resolved: bool,
 }
 
 pub const STACK_SIZE: usize = 32768_u32 as usize;
 
-impl NetworkFeature {
+impl Network {
     fn process_network_response<T>(self, response: &ApiResponse<T>) -> Either<&T, Option<&str>>
     where
         T: DeserializeOwned,
@@ -89,6 +88,27 @@ impl NetworkFeature {
         false
     }
 
+    pub fn set_buzzer(
+        self,
+        ping_data: &PingResponse,
+        play_short_period_buzzer_beep_until_time: &Arc<AtomicSystemTime>,
+        is_continuous_period_buzzer_beep_active: &Arc<AtomicBool>,
+    ) {
+        is_continuous_period_buzzer_beep_active.store(
+            ping_data.is_continuous_period_buzzer_beep_active,
+            Ordering::Relaxed,
+        );
+
+        if ping_data.short_period_buzzer_beep_duration_ms > 0 {
+            match play_short_period_buzzer_beep_until_time.since() {
+                Diff::HasPassed(_) | Diff::ToPass(_) => {
+                    play_short_period_buzzer_beep_until_time
+                        .add_millis_to_now(ping_data.short_period_buzzer_beep_duration_ms as u64);
+                }
+            }
+        }
+    }
+
     fn run_net_connection_worker(&mut self, wifi_adaptor: &mut WifiAdaptor) {
         ////////////////////////////////////////////////////////////////////////////////////////////////
         ////////
@@ -105,7 +125,7 @@ impl NetworkFeature {
                 );
 
                 thread::sleep(Duration::from_millis(
-                    DefaultValues::WIFI_RECONNECTION_DELAY,
+                    DefaultValues::WIFI_RECONNECTION_DELAY_MS,
                 ));
 
                 return;
@@ -143,6 +163,8 @@ impl NetworkFeature {
         &mut self,
         display_tx: &Sender<Option<String>>,
         peripheral_tx: &PeripheralTx,
+        play_short_period_buzzer_beep_until_time: &Arc<AtomicSystemTime>,
+        is_continuous_period_buzzer_beep_active: &Arc<AtomicBool>,
     ) -> anyhow::Result<()> {
         if !self.is_network_connected {
             log::debug!(
@@ -159,7 +181,7 @@ impl NetworkFeature {
             }
 
             // set [WifiConnectedLed] as low since the wifi is not connected
-            PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::WifiConnectedLed(Low));
+            Peripheral::set_peripheral(peripheral_tx, PeripheralKind::WifiConnectedLed(Low));
 
             thread::sleep(Duration::from_millis(100));
 
@@ -181,7 +203,7 @@ impl NetworkFeature {
             }
 
             // set [WifiConnectedLed] as low since the wifi is not connected
-            PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::WifiConnectedLed(Low));
+            Peripheral::set_peripheral(peripheral_tx, PeripheralKind::WifiConnectedLed(Low));
 
             thread::sleep(Duration::from_millis(100));
 
@@ -189,17 +211,17 @@ impl NetworkFeature {
         }
 
         // turn on [WifiConnectedLed] since the network connection has been established now
-        PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::WifiConnectedLed(High));
+        Peripheral::set_peripheral(peripheral_tx, PeripheralKind::WifiConnectedLed(High));
 
         // blink the [ProximaApiRequestLed] to indicate a network api request
         for i in 0_i32..5_i32 {
-            if i % 2 == 0_i32 {
-                PeripheralFeature::set_peripheral(
+            if i % 2_i32 == 0_i32 {
+                Peripheral::set_peripheral(
                     peripheral_tx,
                     PeripheralKind::ProximaApiRequestLed(High),
                 );
             } else {
-                PeripheralFeature::set_peripheral(
+                Peripheral::set_peripheral(
                     peripheral_tx,
                     PeripheralKind::ProximaApiRequestLed(Low),
                 );
@@ -208,13 +230,18 @@ impl NetworkFeature {
             thread::sleep(Duration::from_millis(25));
         }
         // turn off [ProximaApiRequestLed]
-        PeripheralFeature::set_peripheral(peripheral_tx, PeripheralKind::ProximaApiRequestLed(Low));
+        Peripheral::set_peripheral(peripheral_tx, PeripheralKind::ProximaApiRequestLed(Low));
 
-        let ping_resp =  network_apis.ping();
+        // network request starts here
+        let ping_resp = network_apis.ping();
         let processed_network_response = self.process_network_response(&ping_resp);
         match processed_network_response {
             Either::Left(ping_response) => {
-                println!("ping_response {:?}", ping_response);
+                self.set_buzzer(
+                    ping_response,
+                    play_short_period_buzzer_beep_until_time,
+                    is_continuous_period_buzzer_beep_active,
+                );
             }
             Either::Right(segment_display_text) => {
                 if let Some(text) = segment_display_text {
@@ -257,7 +284,9 @@ impl NetworkFeature {
                     log::debug!("[start_netmanager_thread] entering into the next iteration...");
 
                     if Instant::now() - last_exec_time
-                        >= Duration::from_millis(DefaultValues::NET_CONNECTION_MANAGER_THREAD_DELAY)
+                        >= Duration::from_millis(
+                            DefaultValues::NET_CONNECTION_MANAGER_THREAD_DELAY_MS,
+                        )
                     {
                         this.run_net_connection_worker(&mut wifi_adaptor);
 
@@ -284,6 +313,8 @@ impl NetworkFeature {
         worker_condvar: Arc<Condvar>,
         display_tx: Sender<Option<String>>,
         peripheral_tx: PeripheralTx,
+        play_short_period_buzzer_beep_until_time: Arc<AtomicSystemTime>,
+        is_continuous_period_buzzer_beep_active: Arc<AtomicBool>,
     ) -> std::io::Result<JoinHandle<anyhow::Result<()>>> {
         thread::Builder::new()
             .stack_size(STACK_SIZE)
@@ -293,19 +324,21 @@ impl NetworkFeature {
                     .map_err(|e| CommonError::MutexGuard("E0013".to_owned(), e.to_string()))?;
 
                 let timeout_duration = Duration::from_millis(1000);
-
                 let mut last_exec_time = Instant::now();
 
                 loop {
                     log::debug!("[start_workers_thread] entering into the next iteration...");
 
                     if Instant::now() - last_exec_time
-                        >= Duration::from_millis(DefaultValues::APIS_THREAD_DELAY)
+                        >= Duration::from_millis(DefaultValues::APIS_THREAD_DELAY_MS)
                     {
-                        let res = this.run_ping_api_worker(&display_tx, &peripheral_tx);
+                        let res = this.run_ping_api_worker(
+                            &display_tx,
+                            &peripheral_tx,
+                            &play_short_period_buzzer_beep_until_time,
+                            &is_continuous_period_buzzer_beep_active,
+                        );
 
-                        // todo test this logic
-                        // todo make sure that back to back api calls arent happening for success messages
                         // skip setting the [last_exec_time] if there were any errors in the API call
                         // unless the ping was successful we keep ignoring the threshold delay to make sure that our HTTP request goes through at the earliest possible
                         if res.is_ok() {
@@ -328,18 +361,88 @@ impl NetworkFeature {
             })
     }
 
+    pub fn start_buzzer_thread(
+        peripheral_tx: PeripheralTx,
+        play_short_period_buzzer_beep_until_time: Arc<AtomicSystemTime>,
+        is_continuous_period_buzzer_beep_active: Arc<AtomicBool>,
+        display_tx: Sender<Option<String>>,
+    ) -> std::io::Result<JoinHandle<anyhow::Result<()>>> {
+        thread::Builder::new()
+            .stack_size(STACK_SIZE)
+            .spawn(move || -> anyhow::Result<()> {
+                let mut last_exec_time: Instant = Instant::now();
+
+                loop {
+                    if Instant::now() - last_exec_time
+                        >= Duration::from_millis(DefaultValues::BUZZER_THREAD_DELAY_MS)
+                    {
+                        last_exec_time = Instant::now();
+
+                        let is_continuous_period_buzzer_beep_active_ok =
+                            is_continuous_period_buzzer_beep_active.load(Ordering::Relaxed);
+
+                        if is_continuous_period_buzzer_beep_active_ok {
+                            // set [AlertBuzzer] as high
+                            Peripheral::set_peripheral(
+                                &peripheral_tx,
+                                PeripheralKind::AlertBuzzer(High),
+                            );
+
+                            let display_tx_res =
+                                display_tx.send(Some(SegmentDisplayText::SWITCH_OFF.to_owned()));
+                            if let Err(err) = display_tx_res {
+                                error!(
+                            "[E0027d][is_continuous_period_buzzer_beep_active display_tx] {}",
+                            err.to_string()
+                        );
+                            }
+
+                            continue;
+                        }
+
+                        if let Diff::ToPass(_) = play_short_period_buzzer_beep_until_time.since() {
+                            // set [AlertBuzzer] as high
+                            Peripheral::set_peripheral(
+                                &peripheral_tx,
+                                PeripheralKind::AlertBuzzer(High),
+                            );
+
+                            continue;
+                        }
+
+                        // set [AlertBuzzer] as low
+                        Peripheral::set_peripheral(
+                            &peripheral_tx,
+                            PeripheralKind::AlertBuzzer(Low),
+                        );
+                    }
+                }
+            })
+    }
+
     pub fn start(
         this: &Arc<Mutex<Self>>,
         wifi_adaptor: &Arc<Mutex<WifiAdaptor>>,
         seg_display_tx: Sender<Option<String>>,
         peripheral_tx: PeripheralTx,
     ) -> anyhow::Result<()> {
+        let peripheral_tx_cloned1 = peripheral_tx.clone();
         let self_cloned1 = Arc::clone(this);
         let self_cloned2 = Arc::clone(this);
         let wifi_adaptor_cloned1: Arc<Mutex<WifiAdaptor>> = Arc::clone(wifi_adaptor);
 
         let netmanager_thread_condvar = Arc::new(Condvar::new());
         let workers_thread_condvar = Arc::new(Condvar::new());
+
+        let play_short_period_buzzer_beep_until_time = Arc::new(AtomicSystemTime::now());
+        let play_short_period_buzzer_beep_until_time_cloned1 =
+            Arc::<AtomicSystemTime>::clone(&play_short_period_buzzer_beep_until_time);
+
+        let is_continuous_period_buzzer_beep_active = Arc::new(AtomicBool::from(false));
+        let is_continuous_period_buzzer_beep_active_cloned1 =
+            Arc::<AtomicBool>::clone(&is_continuous_period_buzzer_beep_active);
+
+        let seg_display_tx_clone = seg_display_tx.clone();
 
         Self::start_netmanager_thread(
             self_cloned1,
@@ -352,6 +455,15 @@ impl NetworkFeature {
             workers_thread_condvar,
             seg_display_tx,
             peripheral_tx,
+            play_short_period_buzzer_beep_until_time,
+            is_continuous_period_buzzer_beep_active,
+        )?;
+
+        Self::start_buzzer_thread(
+            peripheral_tx_cloned1,
+            play_short_period_buzzer_beep_until_time_cloned1,
+            is_continuous_period_buzzer_beep_active_cloned1,
+            seg_display_tx_clone,
         )?;
 
         Ok(())

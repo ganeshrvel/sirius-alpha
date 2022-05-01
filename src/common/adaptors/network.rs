@@ -30,7 +30,7 @@ impl WifiAdaptor {
             log::warn!("[network] the wifi scanning was unsuccessful. Will try again...");
 
             sleep(Duration::from_millis(
-                DefaultValues::WIFI_RECONNECTION_DELAY,
+                DefaultValues::WIFI_RECONNECTION_DELAY_MS,
             ));
         }
 

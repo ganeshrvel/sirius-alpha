@@ -15,4 +15,5 @@ impl SegmentDisplayText<'static> {
     pub const ERR_API: &'static str = "Err API";
     pub const ERR_JSON: &'static str = "Err JSON";
     pub const ERR_NO_WIFI: &'static str = "Err no yify";
+    pub const SWITCH_OFF: &'static str = "Suuitch Off";
 }

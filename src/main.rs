@@ -52,8 +52,8 @@ use std::thread;
 use std::time::Duration;
 
 use crate::constants::strings::Strings;
-use crate::features::network::NetworkFeature;
-use crate::features::peripheral::{PeripheralFeature, PeripheralFeatureStartPins, PeripheralKind, PeripheralRx, PeripheralTx};
+use crate::features::network::Network;
+use crate::features::peripheral::{Peripheral, PeripheralFeatureStartPins, PeripheralKind, PeripheralRx, PeripheralTx};
 use crate::helpers::logs::fern_log::setup_logging;
 use crate::GpioPinValue::High;
 
@@ -81,14 +81,15 @@ fn main() -> anyhow::Result<()> {
 
 fn run() -> anyhow::Result<()> {
     let (peripheral_tx, peripheral_rx): (PeripheralTx, PeripheralRx) = std::sync::mpsc::channel();
-    let per = PeripheralFeature::new()?;
+    let per = Peripheral::new()?;
     let peripheral_feature_start_pins = PeripheralFeatureStartPins {
-        led_g23: per.out_g32,
+        led_g32: per.out_g32,
         led_g25: per.out_g25,
         led_g26: per.out_g26,
+        buzzer_g14: per.out_g14
     };
-    PeripheralFeature::start(peripheral_feature_start_pins, peripheral_rx)?;
-    PeripheralFeature::set_peripheral(&peripheral_tx, PeripheralKind::PowerOnLed(High));
+    Peripheral::start(peripheral_feature_start_pins, peripheral_rx)?;
+    Peripheral::set_peripheral(&peripheral_tx, PeripheralKind::PowerOnLed(High));
 
     let system_time = esp_idf_svc::systime::EspSystemTime {};
 
@@ -97,8 +98,8 @@ fn run() -> anyhow::Result<()> {
     let (seg_display_tx, seg_display_rx): (Sender<Option<String>>, Receiver<Option<String>>) =
         std::sync::mpsc::channel();
 
-    let net_features = NetworkFeature::new();
-    NetworkFeature::start(
+    let net_features = Network::new();
+    Network::start(
         &Arc::new(Mutex::new(net_features)),
         &wifi_adaptor_arc,
         seg_display_tx,

@@ -14,7 +14,6 @@ pub struct Apis;
 
 impl Apis {
     pub fn ping(self) -> ApiResponse<PingResponse> {
-        // network request starts here
         let json_data = SiriusProximaPing::new()?;
         let mut headers = HashMap::new();
         headers.insert(
