@@ -1,4 +1,6 @@
+use serde_value::Value::U64;
 use std::marker::PhantomData;
+use std::num::ParseIntError;
 
 pub struct EnvValues<'a> {
     /// https://stackoverflow.com/questions/40484154/parameter-a-is-never-used-error-when-a-is-used-in-type-parameter-bound
@@ -8,6 +10,8 @@ pub struct EnvValues<'a> {
 }
 
 impl EnvValues<'static> {
+    pub const APP_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
     pub const WIFI_SSID: &'static str = dotenv!("WIFI_SSID");
 
     pub const WIFI_PASS: &'static str = dotenv!("WIFI_PASS");
@@ -26,5 +30,10 @@ impl EnvValues<'static> {
 
     pub const DEVICE_LOCATION: &'static str = dotenv!("DEVICE_LOCATION");
 
-    pub const APP_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+    pub const FAILSAFE_TRIGGER_CONTINUOUS_PERIOD_BUZZER_BEEP_AFTER_MS: &'static str =
+        dotenv!("FAILSAFE_TRIGGER_CONTINUOUS_PERIOD_BUZZER_BEEP_AFTER_MS");
+
+    pub fn failsafe_trigger_continuous_period_buzzer_beep_after_ms() -> Result<u64, ParseIntError> {
+        Self::FAILSAFE_TRIGGER_CONTINUOUS_PERIOD_BUZZER_BEEP_AFTER_MS.parse::<u64>()
+    }
 }

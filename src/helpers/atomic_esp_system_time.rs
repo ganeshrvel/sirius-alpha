@@ -32,6 +32,14 @@ impl AtomicSystemTime {
         Self(AtomicU64::new(now_ms as u64))
     }
 
+    pub const fn from_millis(ms: u64) -> Self {
+        Self(AtomicU64::new(ms as u64))
+    }
+
+    pub const fn from_duration(d: Duration) -> Self {
+        Self(AtomicU64::new(d.as_millis() as u64))
+    }
+
     pub fn as_millis(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
     }
@@ -72,33 +80,43 @@ impl AtomicSystemTime {
         None
     }
 
-    pub fn set_now(&self) {
+    pub fn set_now(&self) -> Self {
         let now_ms = Self::now_millis();
 
         self.0.store(now_ms, Ordering::Relaxed);
+
+        Self::from_millis(now_ms)
     }
 
-    pub fn add_duration_to_now(&self, d: Duration) {
+    pub fn add_duration_to_now(&self, d: Duration) -> Self {
         let now_d = Self::now_duration() + d;
 
         self.0.store(now_d.as_millis() as u64, Ordering::Relaxed);
+
+        Self::from_duration(now_d)
     }
 
-    pub fn add_millis_to_now(&self, millis: u64) {
+    pub fn add_millis_to_now(&self, millis: u64) -> Self {
         let now_ms = Self::now_millis() + millis;
 
         self.0.store(now_ms, Ordering::Relaxed);
+
+        Self::from_millis(now_ms)
     }
 
-    pub fn add_duration(&self, d: Duration) {
+    pub fn add_duration(&self, d: Duration) -> Self {
         let next = self.as_duration() + d;
 
         self.0.store(next.as_millis() as u64, Ordering::Relaxed);
+
+        Self::from_duration(next)
     }
 
-    pub fn add_millis(&self, millis: u64) {
+    pub fn add_millis(&self, millis: u64) -> Self {
         let next = self.as_millis() + millis;
 
         self.0.store(next, Ordering::Relaxed);
+
+        Self::from_millis(next)
     }
 }

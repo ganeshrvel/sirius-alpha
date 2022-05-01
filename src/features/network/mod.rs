@@ -7,7 +7,7 @@ use crate::features::network::apis::network_apis;
 use crate::features::peripheral::{Peripheral, PeripheralKind, PeripheralTx};
 use crate::helpers::atomic_esp_system_time::{AtomicSystemTime, Diff};
 use crate::GpioPinValue::{High, Low};
-use crate::{CommonError, WifiAdaptor};
+use crate::{CommonError, EnvValues, WifiAdaptor};
 use either::Either;
 use embedded_svc::wifi::{ClientConnectionStatus, ClientIpStatus, ClientStatus, Status, Wifi};
 use esp_idf_sys::c_types::c_uint;
@@ -367,57 +367,99 @@ impl Network {
         is_continuous_period_buzzer_beep_active: Arc<AtomicBool>,
         display_tx: Sender<Option<String>>,
     ) -> std::io::Result<JoinHandle<anyhow::Result<()>>> {
-        thread::Builder::new()
-            .stack_size(STACK_SIZE)
-            .spawn(move || -> anyhow::Result<()> {
-                let mut last_exec_time: Instant = Instant::now();
+        thread::Builder::new().spawn(move || -> anyhow::Result<()> {
+            let mut last_exec_time: Instant = Instant::now();
 
-                loop {
-                    if Instant::now() - last_exec_time
-                        >= Duration::from_millis(DefaultValues::BUZZER_THREAD_DELAY_MS)
-                    {
-                        last_exec_time = Instant::now();
+            let last_buzzed_time: AtomicSystemTime = AtomicSystemTime::now();
+            last_buzzed_time.add_millis_to_now(
+                EnvValues::failsafe_trigger_continuous_period_buzzer_beep_after_ms()?,
+            );
 
-                        let is_continuous_period_buzzer_beep_active_ok =
-                            is_continuous_period_buzzer_beep_active.load(Ordering::Relaxed);
+            loop {
+                if Instant::now() - last_exec_time
+                    >= Duration::from_millis(DefaultValues::BUZZER_THREAD_DELAY_MS)
+                {
+                    last_exec_time = Instant::now();
 
-                        if is_continuous_period_buzzer_beep_active_ok {
-                            // set [AlertBuzzer] as high
-                            Peripheral::set_peripheral(
-                                &peripheral_tx,
-                                PeripheralKind::AlertBuzzer(High),
-                            );
+                    let is_continuous_period_buzzer_beep_active_ok =
+                        is_continuous_period_buzzer_beep_active.load(Ordering::Relaxed);
 
-                            let display_tx_res =
-                                display_tx.send(Some(SegmentDisplayText::SWITCH_OFF.to_owned()));
-                            if let Err(err) = display_tx_res {
-                                error!(
-                            "[E0027d][is_continuous_period_buzzer_beep_active display_tx] {}",
-                            err.to_string()
-                        );
-                            }
-
-                            continue;
-                        }
-
-                        if let Diff::ToPass(_) = play_short_period_buzzer_beep_until_time.since() {
-                            // set [AlertBuzzer] as high
-                            Peripheral::set_peripheral(
-                                &peripheral_tx,
-                                PeripheralKind::AlertBuzzer(High),
-                            );
-
-                            continue;
-                        }
-
-                        // set [AlertBuzzer] as low
+                    if is_continuous_period_buzzer_beep_active_ok {
+                        // set [AlertBuzzer] as high
                         Peripheral::set_peripheral(
                             &peripheral_tx,
-                            PeripheralKind::AlertBuzzer(Low),
+                            PeripheralKind::AlertBuzzer(High),
                         );
+
+                        let display_tx_res =
+                            display_tx.send(Some(SegmentDisplayText::SWITCH_OFF.to_owned()));
+                        if let Err(err) = display_tx_res {
+                            error!(
+                                "[E0027d][is_continuous_period_buzzer_beep_active \
+                            display_tx] {}",
+                                err.to_string()
+                            );
+                        }
+
+                        log::debug!(
+                            "[start_buzzer_thread] continuous period buzzer beep is active"
+                        );
+
+                        last_buzzed_time.add_millis_to_now(
+                            EnvValues::failsafe_trigger_continuous_period_buzzer_beep_after_ms()?,
+                        );
+
+                        continue;
                     }
+
+                    if let Diff::ToPass(_) = play_short_period_buzzer_beep_until_time.since() {
+                        // set [AlertBuzzer] as high
+                        Peripheral::set_peripheral(
+                            &peripheral_tx,
+                            PeripheralKind::AlertBuzzer(High),
+                        );
+
+                        log::debug!("[start_buzzer_thread] short period buzzer beep is active");
+
+                        last_buzzed_time.add_millis_to_now(
+                            EnvValues::failsafe_trigger_continuous_period_buzzer_beep_after_ms()?,
+                        );
+
+                        continue;
+                    }
+
+                    // trigger a continuous period buzzer if the device's buzzer hasn't beeped
+                    // for the past [FAILSAFE_TRIGGER_CONTINUOUS_PERIOD_BUZZER_BEEP_AFTER_MS]
+                    if let Diff::HasPassed(_) = last_buzzed_time.since() {
+                        // set [AlertBuzzer] as high
+                        Peripheral::set_peripheral(
+                            &peripheral_tx,
+                            PeripheralKind::AlertBuzzer(High),
+                        );
+
+                        let display_tx_res =
+                            display_tx.send(Some(SegmentDisplayText::SWITCH_OFF.to_owned()));
+                        if let Err(err) = display_tx_res {
+                            error!(
+                                "[E0027e][is_continuous_period_buzzer_beep_active \
+                            display_tx] {}",
+                                err.to_string()
+                            );
+                        }
+
+                        log::debug!(
+                            "[start_buzzer_thread] failsafe trigger for continuous\
+                             period buzzer is active"
+                        );
+
+                        continue;
+                    }
+
+                    // set [AlertBuzzer] as low
+                    Peripheral::set_peripheral(&peripheral_tx, PeripheralKind::AlertBuzzer(Low));
                 }
-            })
+            }
+        })
     }
 
     pub fn start(
