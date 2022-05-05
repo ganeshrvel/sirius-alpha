@@ -229,4 +229,5 @@ impl SiriusProximaClient {
 pub struct PingResponse {
     pub short_period_buzzer_beep_duration_ms: usize,
     pub is_continuous_period_buzzer_beep_active: bool,
+    pub is_first_ping_after_device_turned_on_registered: bool,
 }

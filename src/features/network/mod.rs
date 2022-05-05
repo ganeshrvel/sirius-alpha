@@ -239,7 +239,12 @@ impl Network {
         match processed_network_response {
             // successful api request
             Either::Left(ping_response) => {
-                self.is_first_ping_after_device_turned_on = false;
+                // set [is_first_ping_after_device_turned_on] as false if we get [is_first_ping_after_device_turned_on_registered] as true
+                // this means we wouldnt be sending the [is_first_ping_after_device_turned_on] flag
+                // to the sirius proxima api once the 'device turned on' notification is sent to the user
+                // todo remove
+                self.is_first_ping_after_device_turned_on =
+                    !ping_response.is_first_ping_after_device_turned_on_registered;
 
                 self.set_buzzer(
                     ping_response,
@@ -437,10 +442,6 @@ impl Network {
                             "[start_buzzer_thread] continuous period buzzer beep is active"
                         );
 
-                        // last_buzzed_time.add_millis_to_now(
-                        //     EnvValues::failsafe_trigger_continuous_period_buzzer_beep_after_ms()?,
-                        // ); //todo test this logical change
-
                         continue;
                     }
 
@@ -452,10 +453,6 @@ impl Network {
                         );
 
                         log::debug!("[start_buzzer_thread] short period buzzer beep is active");
-
-                        // last_buzzed_time.add_millis_to_now(
-                        //     EnvValues::failsafe_trigger_continuous_period_buzzer_beep_after_ms()?,
-                        // ); //todo test this logical change
 
                         continue;
                     }

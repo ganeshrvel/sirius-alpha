@@ -13,6 +13,6 @@ impl DefaultValues<'static> {
     pub const WIFI_RECONNECTION_DELAY_MS: u64 = 4000;
     pub const NET_CONNECTION_MANAGER_THREAD_DELAY_MS: u64 = 4000;
     pub const TM1637_THREAD: u64 = 1000;
-    pub const APIS_THREAD_DELAY_MS: u64 = 3000; //todo change to 30000
+    pub const APIS_THREAD_DELAY_MS: u64 = 30_000; // 30 sec
     pub const BUZZER_THREAD_DELAY_MS: u64 = 500;
 }
