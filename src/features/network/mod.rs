@@ -335,13 +335,13 @@ impl Network {
 
                 let timeout_duration = Duration::from_millis(1000);
                 let mut last_exec_time = Instant::now();
+                let mut delayed_exec_time_duration =
+                    Duration::from_millis(DefaultValues::INITIAL_APIS_THREAD_DELAY_MS);
 
                 loop {
                     log::debug!("[start_workers_thread] entering into the next iteration...");
 
-                    if Instant::now() - last_exec_time
-                        >= Duration::from_millis(DefaultValues::APIS_THREAD_DELAY_MS)
-                    {
+                    if Instant::now() - last_exec_time >= delayed_exec_time_duration {
                         let res = this.run_ping_api_worker(
                             &display_tx,
                             &peripheral_tx,
@@ -353,6 +353,14 @@ impl Network {
                         // unless the ping was successful we keep ignoring the threshold delay to make sure that our HTTP request goes through at the earliest possible
                         if res.is_ok() {
                             last_exec_time = Instant::now();
+
+                            // if the api response was succesfull then set [APIS_THREAD_DELAY_MS] as the delay
+                            delayed_exec_time_duration =
+                                Duration::from_millis(DefaultValues::APIS_THREAD_DELAY_MS);
+                        } else {
+                            // if the api response was a failure then set [INITIAL_APIS_THREAD_DELAY_MS] as the delay so that it could try to make a handshake
+                            delayed_exec_time_duration =
+                                Duration::from_millis(DefaultValues::INITIAL_APIS_THREAD_DELAY_MS);
                         }
                     } else {
                         log::debug!(
