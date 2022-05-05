@@ -3,7 +3,7 @@ use crate::common::errors::api_errors::{ApiClientError, ApiResponseError};
 use crate::common::errors::wifi_errors::WifiError;
 use crate::constants::default_values::DefaultValues;
 use crate::constants::segment_display_text::SegmentDisplayText;
-use crate::features::network::apis::network_apis;
+use crate::features::network::apis::NETWORK_APIS;
 use crate::features::peripheral::{Peripheral, PeripheralKind, PeripheralTx};
 use crate::helpers::atomic_esp_system_time::{AtomicSystemTime, Diff};
 use crate::GpioPinValue::{High, Low};
@@ -27,6 +27,7 @@ pub mod apis;
 pub struct Network {
     is_network_connected: bool,
     is_wifi_ip_resolved: bool,
+    is_first_ping_after_device_turned_on: bool,
 }
 
 pub const STACK_SIZE: usize = 32768_u32 as usize;
@@ -233,16 +234,20 @@ impl Network {
         Peripheral::set_peripheral(peripheral_tx, PeripheralKind::ProximaApiRequestLed(Low));
 
         // network request starts here
-        let ping_resp = network_apis.ping();
+        let ping_resp = NETWORK_APIS.ping(self.is_first_ping_after_device_turned_on);
         let processed_network_response = self.process_network_response(&ping_resp);
         match processed_network_response {
+            // successful api request
             Either::Left(ping_response) => {
+                self.is_first_ping_after_device_turned_on = false;
+
                 self.set_buzzer(
                     ping_response,
                     play_short_period_buzzer_beep_until_time,
                     is_continuous_period_buzzer_beep_active,
                 );
             }
+            // api request failed
             Either::Right(segment_display_text) => {
                 if let Some(text) = segment_display_text {
                     let res = display_tx.send(Some(text.to_owned()));
@@ -381,6 +386,33 @@ impl Network {
                 {
                     last_exec_time = Instant::now();
 
+                    // trigger a continuous period buzzer if the device's buzzer hasn't beeped
+                    // for the past [FAILSAFE_TRIGGER_CONTINUOUS_PERIOD_BUZZER_BEEP_AFTER_MS]
+                    if let Diff::HasPassed(_) = last_buzzed_time.since() {
+                        // set [AlertBuzzer] as high
+                        Peripheral::set_peripheral(
+                            &peripheral_tx,
+                            PeripheralKind::AlertBuzzer(High),
+                        );
+
+                        let display_tx_res =
+                            display_tx.send(Some(SegmentDisplayText::SWITCH_OFF.to_owned()));
+                        if let Err(err) = display_tx_res {
+                            error!(
+                                "[E0027e][is_continuous_period_buzzer_beep_active \
+                            display_tx] {}",
+                                err.to_string()
+                            );
+                        }
+
+                        log::debug!(
+                            "[start_buzzer_thread] failsafe trigger for continuous\
+                             period buzzer is active"
+                        );
+
+                        continue;
+                    }
+
                     let is_continuous_period_buzzer_beep_active_ok =
                         is_continuous_period_buzzer_beep_active.load(Ordering::Relaxed);
 
@@ -405,9 +437,9 @@ impl Network {
                             "[start_buzzer_thread] continuous period buzzer beep is active"
                         );
 
-                        last_buzzed_time.add_millis_to_now(
-                            EnvValues::failsafe_trigger_continuous_period_buzzer_beep_after_ms()?,
-                        );
+                        // last_buzzed_time.add_millis_to_now(
+                        //     EnvValues::failsafe_trigger_continuous_period_buzzer_beep_after_ms()?,
+                        // ); //todo test this logical change
 
                         continue;
                     }
@@ -421,36 +453,9 @@ impl Network {
 
                         log::debug!("[start_buzzer_thread] short period buzzer beep is active");
 
-                        last_buzzed_time.add_millis_to_now(
-                            EnvValues::failsafe_trigger_continuous_period_buzzer_beep_after_ms()?,
-                        );
-
-                        continue;
-                    }
-
-                    // trigger a continuous period buzzer if the device's buzzer hasn't beeped
-                    // for the past [FAILSAFE_TRIGGER_CONTINUOUS_PERIOD_BUZZER_BEEP_AFTER_MS]
-                    if let Diff::HasPassed(_) = last_buzzed_time.since() {
-                        // set [AlertBuzzer] as high
-                        Peripheral::set_peripheral(
-                            &peripheral_tx,
-                            PeripheralKind::AlertBuzzer(High),
-                        );
-
-                        let display_tx_res =
-                            display_tx.send(Some(SegmentDisplayText::SWITCH_OFF.to_owned()));
-                        if let Err(err) = display_tx_res {
-                            error!(
-                                "[E0027e][is_continuous_period_buzzer_beep_active \
-                            display_tx] {}",
-                                err.to_string()
-                            );
-                        }
-
-                        log::debug!(
-                            "[start_buzzer_thread] failsafe trigger for continuous\
-                             period buzzer is active"
-                        );
+                        // last_buzzed_time.add_millis_to_now(
+                        //     EnvValues::failsafe_trigger_continuous_period_buzzer_beep_after_ms()?,
+                        // ); //todo test this logical change
 
                         continue;
                     }
@@ -515,6 +520,7 @@ impl Network {
         Self {
             is_network_connected: false,
             is_wifi_ip_resolved: false,
+            is_first_ping_after_device_turned_on: true,
         }
     }
 }

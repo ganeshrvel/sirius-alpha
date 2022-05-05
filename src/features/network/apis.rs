@@ -6,15 +6,15 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 lazy_static! {
-    pub static ref network_apis: Apis = Apis::new();
+    pub static ref NETWORK_APIS: Apis = Apis::new();
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Apis;
 
 impl Apis {
-    pub fn ping(self) -> ApiResponse<PingResponse> {
-        let json_data = SiriusProximaPing::new()?;
+    pub fn ping(self, is_first_ping_after_device_turned_on: bool) -> ApiResponse<PingResponse> {
+        let json_data = SiriusProximaPing::new(is_first_ping_after_device_turned_on)?;
         let mut headers = HashMap::new();
         headers.insert(
             HeaderKeys::DEVICE_ID,

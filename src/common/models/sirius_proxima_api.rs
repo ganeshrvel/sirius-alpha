@@ -32,10 +32,10 @@ pub struct SiriusProximaPing {
 }
 
 impl SiriusProximaPing {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new(is_first_ping_after_device_turned_on: bool) -> anyhow::Result<Self> {
         Ok(Self {
             device_type: DeviceType::from_str(EnvValues::DEVICE_TYPE)?,
-            device: Device::new()?,
+            device: Device::new(is_first_ping_after_device_turned_on)?,
         })
     }
 }
@@ -47,10 +47,10 @@ pub struct Device {
 }
 
 impl Device {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new(is_first_ping_after_device_turned_on: bool) -> anyhow::Result<Self> {
         Ok(Self {
             device_type: DeviceType::from_str(EnvValues::DEVICE_TYPE)?,
-            details: DeviceDetails::new(),
+            details: DeviceDetails::new(is_first_ping_after_device_turned_on),
         })
     }
 }
@@ -78,10 +78,11 @@ pub struct DeviceDetails {
     pub device_location: String,
     pub revision: u8,
     pub app_version: String,
+    pub is_first_ping_after_device_turned_on: bool,
 }
 
 impl DeviceDetails {
-    pub fn new() -> Self {
+    pub fn new(is_first_ping_after_device_turned_on: bool) -> Self {
         let chip = ChipInfo::new();
 
         Self {
@@ -91,6 +92,7 @@ impl DeviceDetails {
             app_version: EnvValues::APP_VERSION.to_owned(),
             model: chip.model.unwrap_or(Model::Unknown),
             revision: chip.revision,
+            is_first_ping_after_device_turned_on,
         }
     }
 }
