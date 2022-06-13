@@ -6,7 +6,7 @@
 - Contacts: ganeshrvel@outlook.com
 
 # Introduction
-Sirius Alpha is an IOT module which runs on the ESP32 chips, they are safe and super fast. This module is in it's early stages of development.
+Sirius Alpha is an IOT module which runs on the ESP32 chips, they are safe and super fast.
 
 
 ### Device setup
@@ -15,23 +15,10 @@ curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core-installe
 python3 get-platformio.py
 
 cargo install cargo-pio --git https://github.com/ivmarkov/cargo-pio
-cargo pio espidf menuconfig
 ```
 
-- Change setting here: `Component Config (second last option) -> LWIP (scroll down) -> Local netif hostname (first option)`
-- Enter to change the text
-- Press `s` to save
-- 
 
 Rename .sample.env.yaml as .env.yaml and edit the values
-
-- TLS demo https://github.com/killyourphone/tlsdemo
-
-- You will need to source the setup_envs.sh file before things will work! That sets up the correct compiler overrides for ring's cc based build script.
-```shell
-source ./scripts/setup_envs.sh
-```
-
 
 ```shell
 #install node 16 or above
@@ -51,13 +38,19 @@ cd ./scripts
 
 - `.env` file will get automatically generated after running the `./build.sh` file
 
-### Contribute
-If you are interested in fixing issues and contributing directly to the code base.
+### References
+- TLS demo https://github.com/killyourphone/tlsdemo
+
+- You will need to source the setup_envs.sh file before things will work! That sets up the correct compiler overrides for ring's cc based build script.
+```shell
+source ./scripts/setup_envs.sh
+```
+
 
 ### Contacts
 Please feel free to contact me at ganeshrvel@outlook.com
 
 ### License
-Sirius Alpha [WIP] | IOT Module for ESP32 based chips is released under [MIT License](https://github.com/ganeshrvel/sirius-alpha/blob/master/LICENSE "MIT License").
+Sirius Alpha | IOT Module for ESP32 based chips is released under [MIT License](https://github.com/ganeshrvel/sirius-alpha/blob/master/LICENSE "MIT License").
 
 Copyright © 2018-Present Ganesh Rathinavel
