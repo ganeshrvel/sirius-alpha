@@ -1,4 +1,4 @@
-# Sirius Alpha [WIP] | IOT Module for ESP32 based chips
+# Sirius Alpha | IOT Module for ESP32 based chips
 
 - Author: [Ganesh Rathinavel](https://www.linkedin.com/in/ganeshrvel "Ganesh Rathinavel")
 - License: [MIT](https://github.com/ganeshrvel/sirius-alpha/blob/master/LICENSE "MIT")
